@@ -1,8 +1,8 @@
 # encoding: utf-8
 from amqplib import client_0_8 as amqp
 
+
 class MQ():
-    
     def _get_worker_channel(self):
         ''' Подключается к брокеру mq '''
         conn = amqp.Connection(host='srv-4.yottos.com',
@@ -32,7 +32,7 @@ class MQ():
         msg = amqp.Message(msg)
         ch_worker.basic_publish(msg, exchange='getmyad', routing_key='advertise.update')
         ch_worker.close()
-    
+
     def offer_delete(self, offer_Id, campaign_id):
         ch_worker = self._get_worker_channel()
         msg = 'Offer:%s,Campaign:%s' % (offer_Id, campaign_id)
