@@ -7,7 +7,6 @@ import dateutil.parser
 
 log = logging.getLogger(__name__)
 
-
 def mssql_connection_adload():
     pymssql.set_max_connections(450)
     conn = pymssql.connect(host='srv-1.yottos.com',
@@ -19,13 +18,11 @@ def mssql_connection_adload():
     conn.autocommit(True)
     return conn
 
-
 class AdloadData(object):
     'Класс предоставляет интерфейс для взаимодействия и управления ``AdLoad``'
-
     def __init__(self, connection_adload):
         self.connection_adload = connection_adload
-
+    
     def campaign_details(self, campaign):
         ''' Возвращает подробную информацию о кампании ``campaign``.
         Формат ответа::
@@ -48,7 +45,7 @@ class AdloadData(object):
             return False
         cursor.close()
         return True
-
+   
     def campaign_check(self, campaign):
         ''' Возвращает подробную информацию о кампании ``campaign``.
         Формат ответа::
