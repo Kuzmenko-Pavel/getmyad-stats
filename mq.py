@@ -39,3 +39,21 @@ class MQ():
         msg = amqp.Message(msg)
         ch_worker.basic_publish(msg, exchange='getmyad', routing_key='advertise.delete')
         ch_worker.close()
+
+    def informer_rating_update(self):
+        ch_worker = self._get_worker_channel()
+        msg = amqp.Message('')
+        ch_worker.basic_publish(msg, exchange='getmyad', routing_key='rating.informer')
+        ch_worker.close()
+
+    def campaign_rating_update(self):
+        ch_worker = self._get_worker_channel()
+        msg = amqp.Message('')
+        ch_worker.basic_publish(msg, exchange='getmyad', routing_key='rating.campaign')
+        ch_worker.close()
+
+    def offer_rating_update(self):
+        ch_worker = self._get_worker_channel()
+        msg = amqp.Message('')
+        ch_worker.basic_publish(msg, exchange='getmyad', routing_key='rating.offer')
+        ch_worker.close()

@@ -210,6 +210,7 @@ class GetmyadRating(object):
                                 {'$set': udata}, upsert=False)
         for key, value in msg.iteritems():
             MQ().offer_update(key, value)
+        MQ().offer_rating_update()
         print "Created %d rating for offer" % (offer_count)
 
     def createCampaignRatingForInformers(self, db):
@@ -263,6 +264,7 @@ class GetmyadRating(object):
                                            'adv': campaign['adv'],
                                            'adv_int': campaign['adv_int']},
                                           {'$set': udata}, upsert=False)
+        MQ().campaign_rating_update()
 
     def createOfferRatingForInformers(self, db):
         offers = db.stats_daily.rating.find()
@@ -340,7 +342,7 @@ class GetmyadRating(object):
 
         for key, value in msg.iteritems():
             MQ().rating_informer_update(value)
-
+        MQ().informer_rating_update()
         print "Created %d rating for offer-informer" % (offer_count)
 
     def delete_old_rating_stats(self, db):
