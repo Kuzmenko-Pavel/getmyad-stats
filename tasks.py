@@ -186,7 +186,7 @@ def stats_daily_adv_update():
     print 'Import worker data to stats_daily is start'
     GetmyadStats().importWorkerBlockData(db, pool)
     GetmyadStats().importWorkerOfferData(db, pool)
-    GetmyadStats().importWorkerData(db, pool)
+    #GetmyadStats().importWorkerData(db, pool) #?????????????????
     print 'Import worker data elapsed %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
     print 'Count clicks to stats_daily is start'
     GetmyadStats().importClicksFromMongo(db)

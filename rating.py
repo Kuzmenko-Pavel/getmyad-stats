@@ -14,8 +14,8 @@ class GetmyadRating(object):
         elapsed_start_time = datetime.datetime.now()
         rating_buffer = defaultdict(int)
         campaign_rating_buffer = defaultdict(int)
-        filds = {'_id': True, 'id': True, 'dt': True, 'title': True, 'inf': True, 'campaignId': True,
-                 'campaignTitle': True, 'id_int': True, 'inf_int': True, 'campaignId_int': True, 'retargeting': True}
+        filds = {'_id': True, 'id': True, 'inf': True, 'campaignId': True,
+                 'id_int': True, 'inf_int': True, 'campaignId_int': True, 'retargeting': True}
         print "Start import rating Data"
         for db2 in pool:
             try:
@@ -46,14 +46,14 @@ class GetmyadRating(object):
                         try:
                             if last_processed_id <> None and x['_id'] == last_processed_id:
                                 break
-                            n = x['dt']
-                            dt = datetime.datetime(n.year, n.month, n.day)
 
                             key_rating = (
-                            x['id'], x['title'], x['inf'].lower(), dt, x['campaignId'].lower(), x['campaignTitle'], \
-                            x['id_int'], x['inf_int'], x['campaignId_int'])
+                                x['id'], x['inf'].lower(), x['campaignId'].lower(),
+                                x['id_int'], x['inf_int'], x['campaignId_int']
+                            )
                             campaign_key_rating = (
-                            x['inf'].lower(), x['campaignId'].lower(), x['inf_int'], x['campaignId_int'])
+                                x['inf'].lower(), x['campaignId'].lower(), x['inf_int'], x['campaignId_int']
+                            )
                             campaign_rating_buffer[campaign_key_rating] += 1
                             if not x.get('retargeting', False):
                                 rating_buffer[key_rating] += 1
@@ -77,14 +77,13 @@ class GetmyadRating(object):
             try:
                 db.offer.update({'guid': key[0]},
                                 {'$inc': {'impressions': value, 'full_impressions': value}}, False)
-                db.stats_daily.rating.update({'adv': key[2],
-                                              'adv_int': key[7],
+                db.stats_daily.rating.update({'adv': key[1],
+                                              'adv_int': key[4],
                                               'guid': key[0],
-                                              'guid_int': key[6],
-                                              'campaignId': key[4],
-                                              'campaignId_int': key[8],
-                                              'campaignTitle': key[5],
-                                              'title': key[1]},
+                                              'guid_int': key[3],
+                                              'campaignId': key[2],
+                                              'campaignId_int': key[5]
+                                              },
                                              {'$inc': {'impressions': value, 'full_impressions': value}},
                                              upsert=True)
             except Exception, ex:
@@ -125,7 +124,6 @@ class GetmyadRating(object):
             print "importClicksFromMongo: nothing to do"
             return
 
-        buffer = {}
         offer_cost = {}
         buffer_click = []
         processed_records = 0
@@ -148,8 +146,6 @@ class GetmyadRating(object):
 
                 db.stats_daily.rating.update({'adv': x['inf'],
                                               'guid': x['offer'],
-                                              'campaignTitle': x['campaignTitle'],
-                                              'title': x['title'],
                                               'campaignId': x['campaignId']},
                                              {'$inc': {'clicks': 1, 'full_clicks': 1}}, upsert=False)
 
@@ -166,7 +162,10 @@ class GetmyadRating(object):
     def createOfferRating(self, db):
         msg = {}
         campaignIdList = [x['guid'] for x in
-                          db.campaign.find({"showConditions.retargeting": False, "status": "working"})]
+                          db.campaign.find({"showConditions.retargeting": False, "status": "working"}, {
+                              'guid': 1,
+                              '_id': -1
+                          })]
         queri = {"campaignId": {"$in": campaignIdList}}
         offers = db.offer.find(queri)
         offer_count = 0
@@ -281,11 +280,16 @@ class GetmyadRating(object):
                 informersByTitle[informer['guid']] = informer.get('title', 'NOT TITLE')
             except:
                 pass
-        campaignIdList = [x['guid'] for x in
-                          db.campaign.find({"showConditions.retargeting": False, "status": "working"})]
+        campaignIdList = []
+        campaign = {}
+        for x in db.campaign.find({"showConditions.retargeting": False, "status": "working"}, {'guid': 1, 'title': 1, '_id': -1}):
+            campaignIdList.append(x['guid'])
+            campaign[x['guid']] = x['title']
+
         queri = {"campaignId": {"$in": campaignIdList}}
-        for item in db.offer.find(queri, {'guid': True, 'cost': True}):
-            costs[item['guid']] = item['cost']
+        for item in db.offer.find(queri, {'guid': 1, 'cost': 1, 'title': 1, '_id':-1}):
+            costs[item['guid']] = [item['cost'], item['title']]
+
         offers = db.stats_daily.rating.find(queri)
         for offer in offers:
             udata = {}
@@ -295,7 +299,8 @@ class GetmyadRating(object):
             old_clicks = offer.get('old_clicks', 0)
             full_impressions = offer.get('full_impressions', 0)
             full_clicks = offer.get('full_clicks', 0)
-            offer_cost = costs.get(offer['guid'], 0.5)
+            offer_cost, offer_title = costs.get(offer['guid'], [0.5, ''])
+            campaignTitle = campaign.get(offer['campaignId'],'')
             if (clicks and impressions) > 0:
                 ctr = ((float(clicks) / impressions) * 100)
             else:
@@ -308,7 +313,7 @@ class GetmyadRating(object):
                 full_ctr = ((float(full_clicks) / full_impressions) * 100)
             else:
                 full_ctr = 0
-            if (impressions > 1500):
+            if impressions > 1500:
                 rating = (ctr * offer_cost) * 100000
                 udata['rating'] = round(rating, 4)
                 udata['last_rating_update'] = date_update
@@ -317,25 +322,29 @@ class GetmyadRating(object):
                 udata['adv_domain'] = informersBySite.get(offer['adv'], '')
                 udata['adv_title'] = informersByTitle.get(offer['adv'], '')
                 udata['old_clicks'] = clicks
+                udata['title'] = offer_title
+                udata['campaignTitle'] = campaignTitle
             else:
                 if offer.get('last_rating_update') is None:
                     udata['adv_domain'] = informersBySite.get(offer['adv'], '')
                     udata['adv_title'] = informersByTitle.get(offer['adv'], '')
+                    udata['title'] = offer_title
+                    udata['campaignTitle'] = campaignTitle
 
-            if (full_impressions > 1500):
+            if full_impressions > 1500:
                 offer_count += 1
                 rating = (full_ctr * offer_cost) * 100000
                 msg[offer['adv']] = offer['adv_int']
                 udata['full_rating'] = round(rating, 4)
                 udata['cost'] = offer_cost
                 udata['last_full_rating_update'] = date_update
+                udata['title'] = offer_title
+                udata['campaignTitle'] = campaignTitle
             if len(udata) > 0:
                 db.stats_daily.rating.update({'guid': offer['guid'],
                                               'guid_int': offer['guid_int'],
                                               'campaignId': offer['campaignId'],
                                               'campaignId_int': offer['campaignId_int'],
-                                              'campaignTitle': offer['campaignTitle'],
-                                              'title': offer['title'],
                                               'adv': offer['adv'],
                                               'adv_int': offer['adv_int']},
                                              {'$set': udata}, upsert=False)

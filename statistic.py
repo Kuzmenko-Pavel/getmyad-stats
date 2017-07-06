@@ -202,9 +202,8 @@ class GetmyadStats(object):
 
         for key, value in worker_stats.iteritems():
             try:
-                pass
-                # db.worker_stats.update({'date': key[1]},
-                #        {'$inc': {(str(key[0]) + '.' + str(key[2])): value}}, True)
+                db.worker_stats.update({'date': key[1]},
+                                       {'$inc': {(str(key[0]) + '.' + str(key[2])): value}}, True)
             except Exception, ex:
                 print ex
                 print "worker_stats"
@@ -386,16 +385,16 @@ class GetmyadStats(object):
             processed_records += 1
 
             if x.get('social', False):
-                db.stats.daily.update({'guid': x['offer'],
-                                       'campaignId': x['campaignId'],
-                                       'adv': x['inf'],
-                                       'date': datetime.datetime.fromordinal(x['dt'].toordinal())},
-                                      {'$inc': {'social_clicks': 1,
-                                                'view_seconds': abs(x.get('view_seconds', 0)),
-                                                'social_clicksUnique': 1 if x['unique'] else 0,
-                                                'adload_cost': x.get('adload_cost', 0),
-                                                'income': x.get('income', 0),
-                                                'totalCost': x['cost']}}, upsert=True)
+                # db.stats.daily.update({'guid': x['offer'],
+                #                        'campaignId': x['campaignId'],
+                #                        'adv': x['inf'],
+                #                        'date': datetime.datetime.fromordinal(x['dt'].toordinal())},
+                #                       {'$inc': {'social_clicks': 1,
+                #                                 'view_seconds': abs(x.get('view_seconds', 0)),
+                #                                 'social_clicksUnique': 1 if x['unique'] else 0,
+                #                                 'adload_cost': x.get('adload_cost', 0),
+                #                                 'income': x.get('income', 0),
+                #                                 'totalCost': x['cost']}}, upsert=True)
                 db.stats.daily.raw.update({'guid': x['inf'],
                                            'date': datetime.datetime.fromordinal(x['dt'].toordinal())},
                                           {'$inc': {'social_clicks': 1,
@@ -405,16 +404,16 @@ class GetmyadStats(object):
                                                     'income': x.get('income', 0),
                                                     'totalCost': x['cost']}}, upsert=True)
             else:
-                db.stats.daily.update({'guid': x['offer'],
-                                       'campaignId': x['campaignId'],
-                                       'adv': x['inf'],
-                                       'date': datetime.datetime.fromordinal(x['dt'].toordinal())},
-                                      {'$inc': {'clicks': 1,
-                                                'view_seconds': abs(x.get('view_seconds', 0)),
-                                                'clicksUnique': 1 if x['unique'] else 0,
-                                                'adload_cost': x.get('adload_cost', 0),
-                                                'income': x.get('income', 0),
-                                                'totalCost': x['cost']}}, upsert=True)
+                # db.stats.daily.update({'guid': x['offer'],
+                #                        'campaignId': x['campaignId'],
+                #                        'adv': x['inf'],
+                #                        'date': datetime.datetime.fromordinal(x['dt'].toordinal())},
+                #                       {'$inc': {'clicks': 1,
+                #                                 'view_seconds': abs(x.get('view_seconds', 0)),
+                #                                 'clicksUnique': 1 if x['unique'] else 0,
+                #                                 'adload_cost': x.get('adload_cost', 0),
+                #                                 'income': x.get('income', 0),
+                #                                 'totalCost': x['cost']}}, upsert=True)
 
                 db.stats.daily.raw.update({'guid': x['inf'],
                                            'date': datetime.datetime.fromordinal(x['dt'].toordinal())},
