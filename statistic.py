@@ -1191,7 +1191,7 @@ class GetmyadStats(object):
         buf.seek(0)
         ftp = ftplib.FTP(host='cdn.yottos.com')
         ftp.login('cdn', '$www-app$')
-        ftp.cwd('getmyad')
+        ftp.cwd('httpdocs')
         ftp.cwd('report')
         ftp.storbinary('STOR category_report.xls', buf)
         ftp.close()
