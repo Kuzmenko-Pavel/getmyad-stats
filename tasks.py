@@ -176,6 +176,15 @@ def check_campaigns():
     print 'Check outdate campaigns is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
 
 
+@periodic_task(run_every=crontab(minute=[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]))
+def check_cdn():
+    print 'Check cdn is start'
+    elapsed_start_time = datetime.datetime.now()
+    db = _mongo_main_db()
+    GetmyadCheck().check_cdn(db)
+    print 'Check cdn is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
+
+
 @periodic_task(run_every=crontab(hour="*", minute="15, 40"))
 def stats_daily_adv_update():
     u"""Обработка (агрегация) статистики"""

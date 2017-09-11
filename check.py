@@ -1,5 +1,6 @@
 # encoding: utf-8
 import datetime
+import requests
 import pymongo
 
 from adload_data import AdloadData, mssql_connection_adload
@@ -50,3 +51,22 @@ class GetmyadCheck():
                 print u"В кампании нет активных предложений. \n" + \
                       u"Возможные причины: на счету кампании нет денег, не отработал парсер Рынка (для интернет-магазинов).\n" + \
                       u"Замораживаю кампанию: %s %s %s" % (item['guid'], item['title'], result_stop)
+
+    def check_cdn(self, db):
+        date = datetime.datetime.now() - datetime.timedelta(minutes=15)
+        link = []
+        headers = {'X-Cache-Update': '1'}
+        cdns = ['cdn.srv-10.yottos.com', 'cdn.srv-11.yottos.com', 'cdn.srv-12.yottos.com']
+        adv = db['informer'].find({'lastModified': {'$gte': date}})
+
+        for item in adv:
+            guid = item['guid']
+            link.append('/block/%s.json' % guid)
+            link.append('/block/%s.js' % guid)
+            link.append('/getmyad/%s.js' % guid)
+
+        for item in link:
+            for cdn in cdns:
+                url = 'http://%s%s' % (cdn, item)
+                r = requests.get(url, headers=headers, verify=False)
+                print('%s - %s' % (url, r.status_code))

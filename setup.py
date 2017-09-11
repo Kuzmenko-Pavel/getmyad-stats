@@ -15,7 +15,9 @@ requires = [
     "pymongo==3.2.2",
     "pymssql==2.0.1",
     "xlwt==0.7.5",
-    "python-memcached==1.57"
+    "python-memcached==1.57",
+    'requests',
+    'datetime'
 ]
 
 setup(name='yottos-getmyad-stats',
