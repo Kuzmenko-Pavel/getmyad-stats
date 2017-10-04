@@ -11,7 +11,7 @@ class MQ():
                                virtual_host='worker',
                                insist=True)
         ch = conn.channel()
-        ch.exchange_declare(exchange="getmyad", type="topic", durable=False, auto_delete=True)
+        ch.exchange_declare(exchange="getmyad", type="topic", durable=True, auto_delete=False, passive=False)
         return ch
 
     def rating_informer_update(self, guid_int):
