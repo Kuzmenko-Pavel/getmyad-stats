@@ -24,7 +24,7 @@ class GetmyadStats(object):
         for db2 in self.pool:
             try:
                 print(db2)
-                last_processed_id = None
+
                 try:
                     last_processed_id = db2.config.find_one({'key': 'impressions block last _id'})['value']
                 except:
@@ -41,14 +41,14 @@ class GetmyadStats(object):
                 try:
                     end_id = cursor[0]['_id']  # Последний id, который будет обработан в этот раз
                     print(end_id)
-                except:
+                except Exception as e:
                     print("importImpressionsFromMongo: nothing to do")
                     return
 
                 try:
                     for x in cursor:
                         try:
-                            if last_processed_id <> None and x['_id'] == last_processed_id:
+                            if last_processed_id is not None and x['_id'] == last_processed_id:
                                 break
                             n = x['dt']
                             guid = x.get('guid', '')
@@ -94,14 +94,15 @@ class GetmyadStats(object):
         print('%s seconds, %s records processed. \n' % (elapsed, processed_records))
         if 'log.statisticProcess' not in self.db.collection_names():
             self.db.create_collection('log.statisticProcess',
-                                 capped=True, size=50000000, max=10000)
+                                      capped=True, size=50000000, max=10000)
         self.db.log.statisticProcess.insert_one({'dt': datetime.datetime.now(),
-                                            'impressions block': {
-                                                'count': processed_records,
-                                                'elapsed_time': (datetime.datetime.now() - elapsed_start_time).seconds
-                                            },
-                                            'clicks': 'not processed',
-                                            'srv': '2'})
+                                                 'impressions block': {
+                                                     'count': processed_records,
+                                                     'elapsed_time': (
+                                                         datetime.datetime.now() - elapsed_start_time).seconds
+                                                 },
+                                                 'clicks': 'not processed',
+                                                 'srv': '2'})
         if self.db.previous_error():
             print("Database error", self.db.previous_error())
 
@@ -135,14 +136,14 @@ class GetmyadStats(object):
                 try:
                     end_id = cursor[0]['_id']  # Последний id, который будет обработан в этот раз
                     print(end_id)
-                except:
+                except Exception as e:
                     print("importImpressionsFromMongo: nothing to do")
                     return
 
                 try:
                     for x in cursor:
                         try:
-                            if last_processed_id <> None and x['_id'] == last_processed_id:
+                            if last_processed_id is not None and x['_id'] == last_processed_id:
                                 break
                             n = x['dt']
                             dt = datetime.datetime(n.year, n.month, n.day)
@@ -182,12 +183,12 @@ class GetmyadStats(object):
         for key, value in buffer.iteritems():
             try:
                 self.db.stats.daily.raw.update({'guid': key[0],
-                                           'date': key[1]},
+                                                'date': key[1]},
                                                {'$inc':
-                                              {
-                                                  'impressions': value[0],
-                                                  'social_impressions': value[1]
-                                              }},
+                                                   {
+                                                       'impressions': value[0],
+                                                       'social_impressions': value[1]
+                                                   }},
                                                upsert=False, multi=False)
             except Exception as ex:
                 print(ex, "buffer", key, value)
@@ -200,18 +201,19 @@ class GetmyadStats(object):
                 print(ex, "worker_stats", key, value)
 
         elapsed = (datetime.datetime.now() - elapsed_start_time).seconds
-        print('%s seconds, %s records processed. \nFrom this tiser %s social records, tiser %s paymend record' %
+        print('%s seconds, %s records processed. From this tiser %s social records, tiser %s paymend record' %
               (elapsed, processed_records, processed_social_records, processed_paymend_records))
         if 'log.statisticProcess' not in self.db.collection_names():
             self.db.create_collection('log.statisticProcess',
-                                 capped=True, size=50000000, max=10000)
+                                      capped=True, size=50000000, max=10000)
         self.db.log.statisticProcess.insert_one({'dt': datetime.datetime.now(),
-                                            'impressions offer': {
-                                                'count': processed_records,
-                                                'elapsed_time': (datetime.datetime.now() - elapsed_start_time).seconds
-                                            },
-                                            'clicks': 'not processed',
-                                            'srv': '2'})
+                                                 'impressions offer': {
+                                                     'count': processed_records,
+                                                     'elapsed_time':
+                                                         (datetime.datetime.now() - elapsed_start_time).seconds
+                                                 },
+                                                 'clicks': 'not processed',
+                                                 'srv': '2'})
         if self.db.previous_error():
             print("Database error", self.db.previous_error())
 
@@ -238,7 +240,7 @@ class GetmyadStats(object):
         processed_records = 0
         for x in cursor:
 
-            if last_processed_id <> None and x['_id'] == last_processed_id:
+            if last_processed_id is not None and x['_id'] == last_processed_id:
                 break
             buffer_click.append(x)
 
@@ -248,51 +250,30 @@ class GetmyadStats(object):
             processed_records += 1
 
             if x.get('social', False):
-                # self.db.stats.daily.update({'guid': x['offer'],
-                #                        'campaignId': x['campaignId'],
-                #                        'adv': x['inf'],
-                #                        'date': datetime.datetime.fromordinal(x['dt'].toordinal())},
-                #                       {'$inc': {'social_clicks': 1,
-                #                                 'view_seconds': abs(x.get('view_seconds', 0)),
-                #                                 'social_clicksUnique': 1 if x['unique'] else 0,
-                #                                 'adload_cost': x.get('adload_cost', 0),
-                #                                 'income': x.get('income', 0),
-                #                                 'totalCost': x['cost']}}, upsert=True)
                 self.db.stats.daily.raw.update({'guid': x['inf'],
-                                           'date': datetime.datetime.fromordinal(x['dt'].toordinal())},
+                                                'date': datetime.datetime.fromordinal(x['dt'].toordinal())},
                                                {'$inc': {'social_clicks': 1,
-                                                    'view_seconds': abs(x.get('view_seconds', 0)),
-                                                    'social_clicksUnique': 1 if x['unique'] else 0,
-                                                    'adload_cost': x.get('adload_cost', 0),
-                                                    'income': x.get('income', 0),
-                                                    'totalCost': x['cost']}}, upsert=True)
+                                                         'view_seconds': abs(x.get('view_seconds', 0)),
+                                                         'social_clicksUnique': 1 if x['unique'] else 0,
+                                                         'adload_cost': x.get('adload_cost', 0),
+                                                         'income': x.get('income', 0),
+                                                         'totalCost': x['cost']}}, upsert=True)
             else:
-                # self.db.stats.daily.update({'guid': x['offer'],
-                #                        'campaignId': x['campaignId'],
-                #                        'adv': x['inf'],
-                #                        'date': datetime.datetime.fromordinal(x['dt'].toordinal())},
-                #                       {'$inc': {'clicks': 1,
-                #                                 'view_seconds': abs(x.get('view_seconds', 0)),
-                #                                 'clicksUnique': 1 if x['unique'] else 0,
-                #                                 'adload_cost': x.get('adload_cost', 0),
-                #                                 'income': x.get('income', 0),
-                #                                 'totalCost': x['cost']}}, upsert=True)
-
                 self.db.stats.daily.raw.update({'guid': x['inf'],
-                                           'date': datetime.datetime.fromordinal(x['dt'].toordinal())},
+                                                'date': datetime.datetime.fromordinal(x['dt'].toordinal())},
                                                {'$inc': {'clicks': 1,
-                                                    'view_seconds': abs(x.get('view_seconds', 0)),
-                                                    'clicksUnique': 1 if x['unique'] else 0,
-                                                    'adload_cost': x.get('adload_cost', 0),
-                                                    'income': x.get('income', 0),
-                                                    'totalCost': x['cost']}}, upsert=True)
+                                                         'view_seconds': abs(x.get('view_seconds', 0)),
+                                                         'clicksUnique': 1 if x['unique'] else 0,
+                                                         'adload_cost': x.get('adload_cost', 0),
+                                                         'income': x.get('income', 0),
+                                                         'totalCost': x['cost']}}, upsert=True)
             if len(x.get('conformity', '')) > 0:
                 skey = (str(x.get('branch', 'L0')) + '.C' + str(x['conformity']))
             else:
                 skey = (str(x.get('branch', 'L0')) + '.CNONE')
             self.db.worker_stats.update({'date': datetime.datetime.fromordinal(x['dt'].toordinal())},
                                         {'$inc': {skey: 1,
-                                             (str(x.get('branch', 'L0')) + '.CALL'): 1}}, upsert=False)
+                                                  (str(x.get('branch', 'L0')) + '.CALL'): 1}}, upsert=False)
 
         print("Finished %s records in %s seconds" %
               (processed_records, (datetime.datetime.now() - elapsed_start_time).seconds))
@@ -300,10 +281,10 @@ class GetmyadStats(object):
                          'elapsed_time': (datetime.datetime.now() - elapsed_start_time).seconds}
         if 'log.statisticProcess' not in self.db.collection_names():
             self.db.create_collection('log.statisticProcess',
-                                 capped=True, size=50000000, max=10000)
+                                      capped=True, size=50000000, max=10000)
         self.db.log.statisticProcess.insert_one({'dt': datetime.datetime.now(),
-                                            'clicks': result_clicks,
-                                            'srv': socket.gethostname()})
+                                                 'clicks': result_clicks,
+                                                 'srv': socket.gethostname()})
         # Обновляем время обработки статистики
         self.db.config.update({'key': 'last stats_daily update date'},
                               {'$set': {'value': datetime.datetime.now()}}, upsert=True)
@@ -316,7 +297,8 @@ class GetmyadStats(object):
         informersByTitle = {}
         informerList = []
         for informer in self.db.informer.find({},
-                                              {'guid': True, 'domain': True, 'admaker': True, 'user': True, 'title': True}):
+                                              {'guid': True, 'domain': True, 'admaker': True, 'user': True,
+                                               'title': True}):
             try:
                 userGuid = self.db.users.find_one({"login": informer.get('user', 'NOT DOMAIN')}, {'guid': 1, '_id': 0})
                 domainGuid = None
@@ -376,16 +358,16 @@ class GetmyadStats(object):
             impressions_block_not_valid = int(inf['impressions_block_not_valid'])
 
             difference_impressions_block = 100.0 * impressions_block / impressions_block_not_valid if (
-            impressions_block_not_valid > 0 and impressions_block_not_valid > impressions_block) else 100.0
+                impressions_block_not_valid > 0 and impressions_block_not_valid > impressions_block) else 100.0
             clicksUnique = int(inf['clicksUnique'])
             social_clicksUnique = int(inf['social_clicksUnique'])
             ctr_impressions_block = 100.0 * clicksUnique / impressions_block if (
-            clicksUnique > 0 and impressions_block > 0) else 0
+                clicksUnique > 0 and impressions_block > 0) else 0
             ctr_impressions = 100.0 * clicksUnique / impressions if (clicksUnique > 0 and impressions > 0) else 0
             ctr_social_impressions = 100.0 * social_clicksUnique / social_impressions if (
-            social_clicksUnique > 0 and social_impressions > 0) else 0
+                social_clicksUnique > 0 and social_impressions > 0) else 0
             ctr_difference_impressions = 100.0 * ctr_social_impressions / ctr_impressions if (
-            ctr_social_impressions > 0 and ctr_impressions > 0) else 0
+                ctr_social_impressions > 0 and ctr_impressions > 0) else 0
             self.db.stats.daily.adv.update(
                 {'adv': inf['guid'], 'date': inf['date']},
                 {'$set': {'domain': informersBySite.get(inf['guid'], 'NOT DOMAIN')[0],
@@ -464,41 +446,41 @@ class GetmyadStats(object):
             impressions_block = int(x['impressions_block'])
             impressions_block_not_valid = int(x['impressions_block_not_valid'])
             difference_impressions_block = 100.0 * impressions_block / impressions_block_not_valid if (
-            impressions_block_not_valid > 0 and impressions_block_not_valid > impressions_block) else 100.0
+                impressions_block_not_valid > 0 and impressions_block_not_valid > impressions_block) else 100.0
             impressions = int(x['impressions'])
             social_impressions = int(x['social_impressions'])
             clicksUnique = int(x['clicksUnique'])
             social_clicksUnique = int(x['social_clicksUnique'])
             ctr_impressions_block = 100.0 * clicksUnique / impressions_block if (
-            clicksUnique > 0 and impressions_block > 0) else 0
+                clicksUnique > 0 and impressions_block > 0) else 0
             ctr_impressions = 100.0 * clicksUnique / impressions if (clicksUnique > 0 and impressions > 0) else 0
             ctr_social_impressions = 100.0 * social_clicksUnique / social_impressions if (
-            social_clicksUnique > 0 and social_impressions > 0) else 0
+                social_clicksUnique > 0 and social_impressions > 0) else 0
             ctr_difference_impressions = 100.0 * ctr_social_impressions / ctr_impressions if (
-            ctr_social_impressions > 0 and ctr_impressions > 0) else 0
+                ctr_social_impressions > 0 and ctr_impressions > 0) else 0
             self.db.stats.daily.domain.update({'date': x['date'],
-                                          'domain': x['domain'],
-                                          'domain_guid': x['domain_guid']},
+                                               'domain': x['domain'],
+                                               'domain_guid': x['domain_guid']},
                                               {'$set': {'user': x['user'],
-                                                   'user_guid': x['user_guid'],
-                                                   'totalCost': x['totalCost'],
-                                                   'adload_cost': x['adload_cost'],
-                                                   'income': x['income'],
-                                                   'impressions_block': impressions_block,
-                                                   'impressions_block_not_valid': impressions_block_not_valid,
-                                                   'difference_impressions_block': difference_impressions_block,
-                                                   'impressions': impressions,
-                                                   'clicks': x['clicks'],
-                                                   'clicksUnique': clicksUnique,
-                                                   'social_impressions': social_impressions,
-                                                   'social_clicks': x['social_clicks'],
-                                                   'social_clicksUnique': social_clicksUnique,
-                                                   'ctr_impressions_block': ctr_impressions_block,
-                                                   'ctr_impressions': ctr_impressions,
-                                                   'ctr_social_impressions': ctr_social_impressions,
-                                                   'ctr_difference_impressions': ctr_difference_impressions,
-                                                   'view_seconds': x['view_seconds']
-                                                   }},
+                                                        'user_guid': x['user_guid'],
+                                                        'totalCost': x['totalCost'],
+                                                        'adload_cost': x['adload_cost'],
+                                                        'income': x['income'],
+                                                        'impressions_block': impressions_block,
+                                                        'impressions_block_not_valid': impressions_block_not_valid,
+                                                        'difference_impressions_block': difference_impressions_block,
+                                                        'impressions': impressions,
+                                                        'clicks': x['clicks'],
+                                                        'clicksUnique': clicksUnique,
+                                                        'social_impressions': social_impressions,
+                                                        'social_clicks': x['social_clicks'],
+                                                        'social_clicksUnique': social_clicksUnique,
+                                                        'ctr_impressions_block': ctr_impressions_block,
+                                                        'ctr_impressions': ctr_impressions,
+                                                        'ctr_social_impressions': ctr_social_impressions,
+                                                        'ctr_difference_impressions': ctr_difference_impressions,
+                                                        'view_seconds': x['view_seconds']
+                                                        }},
                                               upsert=True)
 
     def agregateStatDailyUser(self, date):
@@ -544,39 +526,39 @@ class GetmyadStats(object):
             impressions_block = int(x['impressions_block'])
             impressions_block_not_valid = int(x['impressions_block_not_valid'])
             difference_impressions_block = 100.0 * impressions_block / impressions_block_not_valid if (
-            impressions_block_not_valid > 0 and impressions_block_not_valid > impressions_block) else 100.0
+                impressions_block_not_valid > 0 and impressions_block_not_valid > impressions_block) else 100.0
             impressions = int(x['impressions'])
             social_impressions = int(x['social_impressions'])
             clicksUnique = int(x['clicksUnique'])
             social_clicksUnique = int(x['social_clicksUnique'])
             ctr_impressions_block = 100.0 * clicksUnique / impressions_block if (
-            clicksUnique > 0 and impressions_block > 0) else 0
+                clicksUnique > 0 and impressions_block > 0) else 0
             ctr_impressions = 100.0 * clicksUnique / impressions if (clicksUnique > 0 and impressions > 0) else 0
             ctr_social_impressions = 100.0 * social_clicksUnique / social_impressions if (
-            social_clicksUnique > 0 and social_impressions > 0) else 0
+                social_clicksUnique > 0 and social_impressions > 0) else 0
             ctr_difference_impressions = 100.0 * ctr_social_impressions / ctr_impressions if (
-            ctr_social_impressions > 0 and ctr_impressions > 0) else 0
+                ctr_social_impressions > 0 and ctr_impressions > 0) else 0
             self.db.stats.daily.user.update({'date': x['date'],
-                                        'user': x['user'],
-                                        'user_guid': x['user_guid']},
+                                             'user': x['user'],
+                                             'user_guid': x['user_guid']},
                                             {'$set': {'totalCost': x['totalCost'],
-                                                 'adload_cost': x['adload_cost'],
-                                                 'income': x['income'],
-                                                 'impressions_block': impressions_block,
-                                                 'impressions_block_not_valid': impressions_block_not_valid,
-                                                 'difference_impressions_block': difference_impressions_block,
-                                                 'impressions': impressions,
-                                                 'clicks': x['clicks'],
-                                                 'clicksUnique': clicksUnique,
-                                                 'social_impressions': social_impressions,
-                                                 'social_clicks': x['social_clicks'],
-                                                 'social_clicksUnique': social_clicksUnique,
-                                                 'ctr_impressions_block': ctr_impressions_block,
-                                                 'ctr_impressions': ctr_impressions,
-                                                 'ctr_social_impressions': ctr_social_impressions,
-                                                 'ctr_difference_impressions': ctr_difference_impressions,
-                                                 'view_seconds': x['view_seconds']
-                                                 }},
+                                                      'adload_cost': x['adload_cost'],
+                                                      'income': x['income'],
+                                                      'impressions_block': impressions_block,
+                                                      'impressions_block_not_valid': impressions_block_not_valid,
+                                                      'difference_impressions_block': difference_impressions_block,
+                                                      'impressions': impressions,
+                                                      'clicks': x['clicks'],
+                                                      'clicksUnique': clicksUnique,
+                                                      'social_impressions': social_impressions,
+                                                      'social_clicks': x['social_clicks'],
+                                                      'social_clicksUnique': social_clicksUnique,
+                                                      'ctr_impressions_block': ctr_impressions_block,
+                                                      'ctr_impressions': ctr_impressions,
+                                                      'ctr_social_impressions': ctr_social_impressions,
+                                                      'ctr_difference_impressions': ctr_difference_impressions,
+                                                      'view_seconds': x['view_seconds']
+                                                      }},
                                             upsert=True)
 
     def agregateStatDailyAll(self, date):
@@ -622,37 +604,37 @@ class GetmyadStats(object):
             impressions_block = int(x['impressions_block'])
             impressions_block_not_valid = int(x['impressions_block_not_valid'])
             difference_impressions_block = 100.0 * impressions_block / impressions_block_not_valid if (
-            impressions_block_not_valid > 0 and impressions_block_not_valid > impressions_block) else 100.0
+                impressions_block_not_valid > 0 and impressions_block_not_valid > impressions_block) else 100.0
             impressions = int(x['impressions'])
             social_impressions = int(x['social_impressions'])
             clicksUnique = int(x['clicksUnique'])
             social_clicksUnique = int(x['social_clicksUnique'])
             ctr_impressions_block = 100.0 * clicksUnique / impressions_block if (
-            clicksUnique > 0 and impressions_block > 0) else 0
+                clicksUnique > 0 and impressions_block > 0) else 0
             ctr_impressions = 100.0 * clicksUnique / impressions if (clicksUnique > 0 and impressions > 0) else 0
             ctr_social_impressions = 100.0 * social_clicksUnique / social_impressions if (
-            social_clicksUnique > 0 and social_impressions > 0) else 0
+                social_clicksUnique > 0 and social_impressions > 0) else 0
             ctr_difference_impressions = 100.0 * ctr_social_impressions / ctr_impressions if (
-            ctr_social_impressions > 0 and ctr_impressions > 0) else 0
+                ctr_social_impressions > 0 and ctr_impressions > 0) else 0
             self.db.stats.daily.all.update({'date': x['date']},
                                            {'$set': {'totalCost': x['totalCost'],
-                                                'adload_cost': x['adload_cost'],
-                                                'income': x['income'],
-                                                'impressions_block': impressions_block,
-                                                'impressions_block_not_valid': impressions_block_not_valid,
-                                                'difference_impressions_block': difference_impressions_block,
-                                                'impressions': impressions,
-                                                'clicks': x['clicks'],
-                                                'clicksUnique': clicksUnique,
-                                                'social_impressions': social_impressions,
-                                                'social_clicks': x['social_clicks'],
-                                                'social_clicksUnique': social_clicksUnique,
-                                                'ctr_impressions_block': ctr_impressions_block,
-                                                'ctr_impressions': ctr_impressions,
-                                                'ctr_social_impressions': ctr_social_impressions,
-                                                'ctr_difference_impressions': ctr_difference_impressions,
-                                                'view_seconds': x['view_seconds']
-                                                }},
+                                                     'adload_cost': x['adload_cost'],
+                                                     'income': x['income'],
+                                                     'impressions_block': impressions_block,
+                                                     'impressions_block_not_valid': impressions_block_not_valid,
+                                                     'difference_impressions_block': difference_impressions_block,
+                                                     'impressions': impressions,
+                                                     'clicks': x['clicks'],
+                                                     'clicksUnique': clicksUnique,
+                                                     'social_impressions': social_impressions,
+                                                     'social_clicks': x['social_clicks'],
+                                                     'social_clicksUnique': social_clicksUnique,
+                                                     'ctr_impressions_block': ctr_impressions_block,
+                                                     'ctr_impressions': ctr_impressions,
+                                                     'ctr_social_impressions': ctr_social_impressions,
+                                                     'ctr_difference_impressions': ctr_difference_impressions,
+                                                     'view_seconds': x['view_seconds']
+                                                     }},
                                            upsert=True)
 
     def agregateStatUserSummary(self, date):
@@ -736,162 +718,162 @@ class GetmyadStats(object):
         for x in cur1:
             self.db.stats.user.summary.update({'user': x['user']},
                                               {'$set': {'totalCost': x['totalCost'],
-                                                   'impressions_block': x['impressions_block'],
-                                                   'impressions': x['impressions'],
-                                                   'clicks': x['clicks'],
-                                                   'clicksUnique': x['clicksUnique'],
-                                                   'social_impressions': x['social_impressions'],
-                                                   'social_clicks': x['social_clicks'],
-                                                   'social_clicksUnique': x['social_clicksUnique'],
-                                                   }},
+                                                        'impressions_block': x['impressions_block'],
+                                                        'impressions': x['impressions'],
+                                                        'clicks': x['clicks'],
+                                                        'clicksUnique': x['clicksUnique'],
+                                                        'social_impressions': x['social_impressions'],
+                                                        'social_clicks': x['social_clicks'],
+                                                        'social_clicksUnique': x['social_clicksUnique'],
+                                                        }},
                                               upsert=True)
             if x['user'] in userStats1:
                 userStats1.remove(x['user'])
         for x in userStats1:
             self.db.stats.user.summary.update({'user': x},
                                               {'$set': {'totalCost': 0,
-                                                   'impressions_block': 0,
-                                                   'impressions': 0,
-                                                   'clicks': 0,
-                                                   'clicksUnique': 0,
-                                                   'social_impressions': 0,
-                                                   'social_clicks': 0,
-                                                   'social_clicksUnique': 0
-                                                   }},
+                                                        'impressions_block': 0,
+                                                        'impressions': 0,
+                                                        'clicks': 0,
+                                                        'clicksUnique': 0,
+                                                        'social_impressions': 0,
+                                                        'social_clicks': 0,
+                                                        'social_clicksUnique': 0
+                                                        }},
                                               upsert=True)
         for x in cur2:
             self.db.stats.user.summary.update({'user': x['user']},
                                               {'$set': {'totalCost_2': x['totalCost'],
-                                                   'impressions_block_2': x['impressions_block'],
-                                                   'impressions_2': x['impressions'],
-                                                   'clicks_2': x['clicks'],
-                                                   'clicksUnique_2': x['clicksUnique'],
-                                                   'social_impressions_2': x['social_impressions'],
-                                                   'social_clicks_2': x['social_clicks'],
-                                                   'social_clicksUnique_2': x['social_clicksUnique']
-                                                   }},
+                                                        'impressions_block_2': x['impressions_block'],
+                                                        'impressions_2': x['impressions'],
+                                                        'clicks_2': x['clicks'],
+                                                        'clicksUnique_2': x['clicksUnique'],
+                                                        'social_impressions_2': x['social_impressions'],
+                                                        'social_clicks_2': x['social_clicks'],
+                                                        'social_clicksUnique_2': x['social_clicksUnique']
+                                                        }},
                                               upsert=True)
             if x['user'] in userStats2:
                 userStats2.remove(x['user'])
         for x in userStats2:
             self.db.stats.user.summary.update({'user': x},
                                               {'$set': {'totalCost_2': 0,
-                                                   'impressions_block_2': 0,
-                                                   'impressions_2': 0,
-                                                   'clicks_2': 0,
-                                                   'clicksUnique_2': 0,
-                                                   'social_impressions_2': 0,
-                                                   'social_clicks_2': 0,
-                                                   'social_clicksUnique_2': 0
-                                                   }},
+                                                        'impressions_block_2': 0,
+                                                        'impressions_2': 0,
+                                                        'clicks_2': 0,
+                                                        'clicksUnique_2': 0,
+                                                        'social_impressions_2': 0,
+                                                        'social_clicks_2': 0,
+                                                        'social_clicksUnique_2': 0
+                                                        }},
                                               upsert=True)
 
         for x in cur3:
             self.db.stats.user.summary.update({'user': x['user']},
                                               {'$set': {'totalCost_3': x['totalCost'],
-                                                   'impressions_block_3': x['impressions_block'],
-                                                   'impressions_3': x['impressions'],
-                                                   'clicks_3': x['clicks'],
-                                                   'clicksUnique_3': x['clicksUnique'],
-                                                   'social_impressions_3': x['social_impressions'],
-                                                   'social_clicks_3': x['social_clicks'],
-                                                   'social_clicksUnique_3': x['social_clicksUnique']
-                                                   }},
+                                                        'impressions_block_3': x['impressions_block'],
+                                                        'impressions_3': x['impressions'],
+                                                        'clicks_3': x['clicks'],
+                                                        'clicksUnique_3': x['clicksUnique'],
+                                                        'social_impressions_3': x['social_impressions'],
+                                                        'social_clicks_3': x['social_clicks'],
+                                                        'social_clicksUnique_3': x['social_clicksUnique']
+                                                        }},
                                               upsert=True)
             if x['user'] in userStats3:
                 userStats3.remove(x['user'])
         for x in userStats3:
             self.db.stats.user.summary.update({'user': x},
                                               {'$set': {'totalCost_3': 0,
-                                                   'impressions_block_3': 0,
-                                                   'impressions_3': 0,
-                                                   'clicks_3': 0,
-                                                   'clicksUnique_3': 0,
-                                                   'social_impressions_3': 0,
-                                                   'social_clicks_3': 0,
-                                                   'social_clicksUnique_3': 0
-                                                   }},
+                                                        'impressions_block_3': 0,
+                                                        'impressions_3': 0,
+                                                        'clicks_3': 0,
+                                                        'clicksUnique_3': 0,
+                                                        'social_impressions_3': 0,
+                                                        'social_clicks_3': 0,
+                                                        'social_clicksUnique_3': 0
+                                                        }},
                                               upsert=True)
 
         for x in cur7:
             self.db.stats.user.summary.update({'user': x['user']},
                                               {'$set': {'totalCost_7': x['totalCost'],
-                                                   'impressions_block_7': x['impressions_block'],
-                                                   'impressions_7': x['impressions'],
-                                                   'clicks_7': x['clicks'],
-                                                   'clicksUnique_7': x['clicksUnique'],
-                                                   'social_impressions_7': x['social_impressions'],
-                                                   'social_clicks_7': x['social_clicks'],
-                                                   'social_clicksUnique_7': x['social_clicksUnique']
-                                                   }},
+                                                        'impressions_block_7': x['impressions_block'],
+                                                        'impressions_7': x['impressions'],
+                                                        'clicks_7': x['clicks'],
+                                                        'clicksUnique_7': x['clicksUnique'],
+                                                        'social_impressions_7': x['social_impressions'],
+                                                        'social_clicks_7': x['social_clicks'],
+                                                        'social_clicksUnique_7': x['social_clicksUnique']
+                                                        }},
                                               upsert=True)
             if x['user'] in userStats7:
                 userStats7.remove(x['user'])
         for x in userStats7:
             self.db.stats.user.summary.update({'user': x},
                                               {'$set': {'totalCost_7': 0,
-                                                   'impressions_block_7': 0,
-                                                   'impressions_7': 0,
-                                                   'clicks_7': 0,
-                                                   'clicksUnique_7': 0,
-                                                   'social_impressions_7': 0,
-                                                   'social_clicks_7': 0,
-                                                   'social_clicksUnique_7': 0
-                                                   }},
+                                                        'impressions_block_7': 0,
+                                                        'impressions_7': 0,
+                                                        'clicks_7': 0,
+                                                        'clicksUnique_7': 0,
+                                                        'social_impressions_7': 0,
+                                                        'social_clicks_7': 0,
+                                                        'social_clicksUnique_7': 0
+                                                        }},
                                               upsert=True)
 
         for x in cur30:
             self.db.stats.user.summary.update({'user': x['user']},
                                               {'$set': {'totalCost_30': x['totalCost'],
-                                                   'impressions_block_30': x['impressions_block'],
-                                                   'impressions_30': x['impressions'],
-                                                   'clicks_30': x['clicks'],
-                                                   'clicksUnique_30': x['clicksUnique'],
-                                                   'social_impressions_30': x['social_impressions'],
-                                                   'social_clicks_30': x['social_clicks'],
-                                                   'social_clicksUnique_30': x['social_clicksUnique']
-                                                   }},
+                                                        'impressions_block_30': x['impressions_block'],
+                                                        'impressions_30': x['impressions'],
+                                                        'clicks_30': x['clicks'],
+                                                        'clicksUnique_30': x['clicksUnique'],
+                                                        'social_impressions_30': x['social_impressions'],
+                                                        'social_clicks_30': x['social_clicks'],
+                                                        'social_clicksUnique_30': x['social_clicksUnique']
+                                                        }},
                                               upsert=True)
             if x['user'] in userStats30:
                 userStats30.remove(x['user'])
         for x in userStats30:
             self.db.stats.user.summary.update({'user': x},
                                               {'$set': {'totalCost_30': 0,
-                                                   'impressions_block_30': 0,
-                                                   'impressions_30': 0,
-                                                   'clicks_30': 0,
-                                                   'clicksUnique_30': 0,
-                                                   'social_impressions_30': 0,
-                                                   'social_clicks_30': 0,
-                                                   'social_clicksUnique_30': 0
-                                                   }},
+                                                        'impressions_block_30': 0,
+                                                        'impressions_30': 0,
+                                                        'clicks_30': 0,
+                                                        'clicksUnique_30': 0,
+                                                        'social_impressions_30': 0,
+                                                        'social_clicks_30': 0,
+                                                        'social_clicksUnique_30': 0
+                                                        }},
                                               upsert=True)
 
         for x in cur365:
             self.db.stats.user.summary.update({'user': x['user']},
                                               {'$set': {'totalCost_365': x['totalCost'],
-                                                   'impressions_block_365': x['impressions_block'],
-                                                   'impressions_365': x['impressions'],
-                                                   'clicks_365': x['clicks'],
-                                                   'clicksUnique_365': x['clicksUnique'],
-                                                   'social_impressions_365': x['social_impressions'],
-                                                   'social_clicks_365': x['social_clicks'],
-                                                   'social_clicksUnique_365': x['social_clicksUnique']
-                                                   }},
+                                                        'impressions_block_365': x['impressions_block'],
+                                                        'impressions_365': x['impressions'],
+                                                        'clicks_365': x['clicks'],
+                                                        'clicksUnique_365': x['clicksUnique'],
+                                                        'social_impressions_365': x['social_impressions'],
+                                                        'social_clicks_365': x['social_clicks'],
+                                                        'social_clicksUnique_365': x['social_clicksUnique']
+                                                        }},
                                               upsert=True)
             if x['user'] in userStats365:
                 userStats365.remove(x['user'])
         for x in userStats365:
             self.db.stats.user.summary.update({'user': x},
                                               {'$set': {'totalCost_365': 0,
-                                                   'impressions_block_365': 0,
-                                                   'impressions_365': 0,
-                                                   'clicks_365': 0,
-                                                   'clicksUnique_365': 0,
-                                                   'social_impressions_365': 0,
-                                                   'social_clicks_365': 0,
-                                                   'social_clicksUnique_365': 0
-                                                   }},
+                                                        'impressions_block_365': 0,
+                                                        'impressions_365': 0,
+                                                        'clicks_365': 0,
+                                                        'clicksUnique_365': 0,
+                                                        'social_impressions_365': 0,
+                                                        'social_clicks_365': 0,
+                                                        'social_clicksUnique_365': 0
+                                                        }},
                                               upsert=True)
 
         # Доход
@@ -899,7 +881,7 @@ class GetmyadStats(object):
         income = self.db.stats.daily.user.group(['user'],
                                                 {},
                                                 {'sum': 0},
-                                           'function(o,p) {p.sum += (o.totalCost || 0); }')
+                                                'function(o,p) {p.sum += (o.totalCost || 0); }')
         for item in income:
             inc[item.get('user')] = item.get('sum', 0.0)
         # Сумма выведенных денег
@@ -907,7 +889,7 @@ class GetmyadStats(object):
         outcome = self.db.money_out_request.group(['user.login'],
                                                   {'approved': True},
                                                   {'sum': 0},
-                                             'function(o,p) {p.sum += (o.summ || 0); }')
+                                                  'function(o,p) {p.sum += (o.summ || 0); }')
         for item in outcome:
             outc[item.get('user.login')] = item.get('sum', 0.0)
         for key, value in inc.iteritems():
@@ -944,7 +926,7 @@ class GetmyadStats(object):
             if item.get('impressions_block', 0) > 100:
                 activity = 'greenflag'
             if (activity == 'orangeflag') and (
-                (activity_yesterday != 'orangeflag') or (activity_before_yesterday != 'orangeflag')):
+                        (activity_yesterday != 'orangeflag') or (activity_before_yesterday != 'orangeflag')):
                 activity = 'redflag'
             item['activity'] = activity
             item['activity_yesterday'] = activity_yesterday
@@ -965,8 +947,8 @@ class GetmyadStats(object):
             domains_today += x.get('active_domains', {}).get('today', 0)
         self.db.stats.daily.all.update({'date': date},
                                        {'$set': {'act_acc_count': act_acc_count,
-                                            'domains_today': domains_today,
-                                            'acc_count': len(users)}},
+                                                 'domains_today': domains_today,
+                                                 'acc_count': len(users)}},
                                        upsert=False)
         current_time = datetime.datetime.today()
         self.db.config.update({'key': 'last stats_user_summary update'},
@@ -1041,7 +1023,7 @@ class GetmyadStats(object):
                 sheet.write(count + idx, 2, val, style1)
                 sheet.row(count + idx).height_mismatch = True
                 sheet.row(count + idx).height = 300
-            if (len(value['activ']) >= len(value['notActiv'])):
+            if len(value['activ']) >= len(value['notActiv']):
                 count += len(value['activ'])
             else:
                 count += len(value['notActiv'])

@@ -7,11 +7,11 @@ class GetmyadClean():
         self.db = db
 
     def clean_ip_blacklist(self):
-        u"""Удаляет старые записи из чёрного списка"""
+        """Удаляет старые записи из чёрного списка"""
         print(self.db.blacklist.ip.remove({'dt': {'$lte': datetime.datetime.now() - datetime.timedelta(weeks=2)}}))
 
     def decline_unconfirmed_moneyout_requests(self):
-        u"""Отклоняет заявки, которые пользователи не подтвердили в течении трёх
+        """Отклоняет заявки, которые пользователи не подтвердили в течении трёх
             дней"""
         clean_to_date = datetime.datetime.now() - datetime.timedelta(days=3)
         print('Decline unconfirmed %s' % clean_to_date)
@@ -21,22 +21,25 @@ class GetmyadClean():
              'date': {'$lte': clean_to_date}})
 
     def delete_old_stats(self):
-        u"""Удаляем старую статистику"""
+        """Удаляем старую статистику"""
         delete_to_date = datetime.datetime.now() - datetime.timedelta(days=3)
         print(self.db.stats.daily.remove({'date': {'$lt': delete_to_date}}))
         print(self.db.stats.daily.raw.remove({'date': {'$lt': delete_to_date}}))
 
     def delete_click_rejected(self):
-        u"""Удаляем старую статистику по отклонённым кликам"""
+        """Удаляем старую статистику по отклонённым кликам"""
         delete_to_date = datetime.datetime.now() - datetime.timedelta(days=4)
         print(self.db.clicks.rejected.remove({'dt': {'$lt': delete_to_date}}))
 
-    def delete_old_offers(self, rpc):
-        CampaignId = self.db.campaign.group(key={'guid': True}, condition={}, reduce='function(obj,prev){}', initial={})
-        CampaignId = map(lambda x: x['guid'], CampaignId)
+    def delete_old_offers(self):
+        campaign_id = self.db.campaign.group(key={'guid': True},
+                                             condition={},
+                                             reduce='function(obj,prev){}',
+                                             initial={})
+        campaign_id = map(lambda x: x['guid'], campaign_id)
         count = 0
         for x in self.db.offer.find():
-            if x['campaignId'] not in CampaignId:
+            if x['campaignId'] not in campaign_id:
                 print("Delete offer guid : %s" % x)
                 self.db.offer.remove(x)
                 count += 1

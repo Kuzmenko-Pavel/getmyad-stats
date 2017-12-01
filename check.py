@@ -11,23 +11,21 @@ class GetmyadCheck():
     def __init__(self, db, rpc):
         self.db = db
         self.rpc = rpc
+        self.watch_last_n_minutes = 60
 
     def check_outdated_campaigns(self):
-        ''' Иногда AdLoad не оповещает GetMyAd об остановке кампании, об отработке
+        """ Иногда AdLoad не оповещает GetMyAd об остановке кампании, об отработке
             парсера и т.д. Это приводит к тому, что кампания продолжает крутиться
             в GetMyAd, но клики не засчитываются и записываются в clicks.error.
             Данная задача проверяет, не произошло ли за последнее время несколько
-            таких ошибок и, если произошло, обновляет кампанию. '''
-
-        WATCH_LAST_N_MINUTES = 60  # Смотрим лог за последние N минут
-        ALLOWED_ERRORS = 1  # Допустимое количество ошибок на одну кампанию
+            таких ошибок и, если произошло, обновляет кампанию. """
 
         # Смотрим лог ошибок, начиная с конца
         c = self.db['clicks.error'].find().sort('$natural', pymongo.DESCENDING)
         now = datetime.datetime.now()
         campaigns = []
         for item in c:
-            if (now - item['dt']).seconds > WATCH_LAST_N_MINUTES * 60:
+            if (now - item['dt']).seconds > self.watch_last_n_minutes * 60:
                 break
             guid = item.get('campaignId', '')
             if guid is not None and len(guid) > 1:

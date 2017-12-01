@@ -64,14 +64,13 @@ def delete_old_offers():
     print('Delete old offers is start')
     elapsed_start_time = datetime.datetime.now()
     db = _mongo_main_db()
-    rpc = xmlrpclib.ServerProxy(GETMYAD_XMLRPC_HOST)
     clean = GetmyadClean(db)
-    clean.delete_old_offers(rpc)
+    clean.delete_old_offers()
     print('Delete old offers is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
 @periodic_task(run_every=crontab(hour=[1, 11, 16, 21], minute=0))
-def managerInvoceCalck():
+def manager_invoce_calck():
     print('Manager invoce calck stats is start')
     elapsed_start_time = datetime.datetime.now()
     db = _mongo_main_db()
@@ -93,7 +92,7 @@ def decline_unconfirmed_moneyout_requests():
 
 
 @periodic_task(run_every=crontab(minute="20, 45", hour="*"))
-def createOfferRating():
+def create_offer_rating():
     u"""Создаем отдельные рейтинги для каждого рекламного блока"""
     elapsed_start_time = datetime.datetime.now()
     db = _mongo_main_db()
@@ -156,7 +155,8 @@ def check_outdated_campaigns():
     elapsed_start_time = datetime.datetime.now()
     db = _mongo_main_db()
     rpc = xmlrpclib.ServerProxy(GETMYAD_XMLRPC_HOST)
-    GetmyadCheck().check_outdated_campaigns(db, rpc)
+    check = GetmyadCheck(db, rpc)
+    check.check_outdated_campaigns()
     print('Check outdate campaigns is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
