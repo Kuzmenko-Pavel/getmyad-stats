@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
+import datetime
 import xmlrpclib
 
-import datetime
 import pymongo
 from celery.schedules import crontab
 from celery.task import periodic_task
@@ -43,61 +43,53 @@ def _mongo_worker_db_pool():
         try:
             pool.append(_mongo_connection(host)[MONGO_WORKER_DATABASE])
         except Exception as e:
-            print e, host
+            print(e, host)
     return pool
-
-
-def test():
-    u"""Обработка (агрегация) статистики"""
-    db = _mongo_main_db()
-    pool = _mongo_worker_db_pool()
-    elapsed_start_time = datetime.datetime.now()
-    GetmyadStats().importWorkerBlockData(db, pool)
-    GetmyadStats().importWorkerOfferData(db, pool)
-    # GetmyadStats().importClicksFromMongo(db)
 
 
 @periodic_task(run_every=crontab(hour="*", minute=0))
 def clean_ip_blacklist():
     u"""Удаляет старые записи из чёрного списка"""
-    print 'Clean IP Blacklist is start'
+    print('Clean IP Blacklist is start')
     elapsed_start_time = datetime.datetime.now()
     db = _mongo_main_db()
-    GetmyadClean().clean_ip_blacklist(db)
-    print 'Clean IP Blacklist is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
+    clean = GetmyadClean(db)
+    clean.clean_ip_blacklist()
+    print('Clean IP Blacklist is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
 @periodic_task(run_every=crontab(hour=[1, 3, 6, 9, 12, 15, 18, 21, 23], minute=0))
 def delete_old_offers():
     u"""Удаляет старые записи из чёрного списка"""
-    print 'Delete old offers is start'
+    print('Delete old offers is start')
     elapsed_start_time = datetime.datetime.now()
     db = _mongo_main_db()
     rpc = xmlrpclib.ServerProxy(GETMYAD_XMLRPC_HOST)
-    GetmyadClean().delete_old_offers(db, rpc)
-    print 'Delete old offers is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
+    clean = GetmyadClean(db)
+    clean.delete_old_offers(rpc)
+    print('Delete old offers is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
 @periodic_task(run_every=crontab(hour=[1, 11, 16, 21], minute=0))
 def managerInvoceCalck():
-    print 'Manager invoce calck stats is start'
+    print('Manager invoce calck stats is start')
     elapsed_start_time = datetime.datetime.now()
     db = _mongo_main_db()
     GetmyadManagerStats().culculateInvoce(db, datetime.date.today())
-    print 'Manager invoce calck stats is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
-    pass
+    print('Manager invoce calck stats is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
 @periodic_task(run_every=crontab(hour=[0, 8, 16], minute=0))
 def decline_unconfirmed_moneyout_requests():
     u"""Отклоняет заявки, которые пользователи не подтвердили в течении трёх
         дней"""
-    print 'Decline unconfirmed moneyout requests is start'
+    print('Decline unconfirmed moneyout requests is start')
     elapsed_start_time = datetime.datetime.now()
     db = _mongo_main_db()
-    GetmyadClean().decline_unconfirmed_moneyout_requests(db)
-    print 'Decline unconfirmed moneyout requests is end %s second' % (
-    datetime.datetime.now() - elapsed_start_time).seconds
+    clean = GetmyadClean(db)
+    clean.decline_unconfirmed_moneyout_requests()
+    print('Decline unconfirmed moneyout requests is end %s second' % (
+        datetime.datetime.now() - elapsed_start_time).seconds)
 
 
 @periodic_task(run_every=crontab(minute="20, 45", hour="*"))
@@ -106,48 +98,53 @@ def createOfferRating():
     elapsed_start_time = datetime.datetime.now()
     db = _mongo_main_db()
     pool = _mongo_worker_db_pool()
-    print 'Import worker rating data to stats_daily is start'
-    GetmyadRating().importWorkerData(db, pool)
-    print 'Import worker rating data elapsed %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
-    print 'Count clicks to rating is start'
-    GetmyadRating().importClicksFromMongo(db)
-    print 'Count cliks elapsed %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
-    print 'Create rating for offer is start'
-    GetmyadRating().createOfferRating(db)
-    GetmyadRating().createCampaignRatingForInformers(db)
-    GetmyadRating().createOfferRatingForInformers(db)
-    print 'Create rating for offer is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
+    rating = GetmyadRating(db, pool)
+    print('Import worker rating data to stats_daily is start')
+    rating.importWorkerData()
+    print('Import worker rating data elapsed %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
+    print('Count clicks to rating is start')
+    rating.importClicksFromMongo()
+    print('Count cliks elapsed %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
+    print('Create rating for offer is start')
+    rating.createOfferRating()
+    rating.createCampaignRatingForInformers()
+    rating.createOfferRatingForInformers()
+    print('Create rating for offer is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
 @periodic_task(run_every=crontab(minute="0", hour="0"))
 def delete_old_stats():
     u"""Удаляем старую статистику"""
-    print 'Delete old data is start'
+    print('Delete old data is start')
     elapsed_start_time = datetime.datetime.now()
     db = _mongo_main_db()
-    GetmyadClean().delete_old_stats(db)
-    print 'Delete old data is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
+    clean = GetmyadClean(db)
+    clean.delete_old_stats()
+    print('Delete old data is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
 @periodic_task(run_every=crontab(minute="0", hour="0"))
 def delete_click_rejected():
     u"""Удаляем старые отклонённые клики"""
-    print 'Delete old click rejected is start'
+    print('Delete old click rejected is start')
     elapsed_start_time = datetime.datetime.now()
     db = _mongo_main_db()
-    GetmyadClean().delete_click_rejected(db)
-    print 'Delete old click rejected is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
+    clean = GetmyadClean(db)
+    clean.delete_click_rejected()
+    print('Delete old click rejected is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
 @periodic_task(run_every=crontab(minute=10, hour=0))
 def delete_old_rating_stats():
     u"""Удаляем старую статистику для рейтингов"""
-    print 'Delete old rating data is start'
+    print('Delete old rating data is start')
     elapsed_start_time = datetime.datetime.now()
     db = _mongo_main_db()
-    GetmyadRating().trunkete_rating_stats(db)
-    GetmyadRating().delete_old_rating_stats(db)
-    print 'Delete old rating data is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
+    pool = _mongo_worker_db_pool()
+    rating = GetmyadRating(db, pool)
+    rating.trunkete_rating_stats()
+    rating.delete_old_rating_stats()
+    print('Delete old rating data is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
 @periodic_task(run_every=crontab(minute="12", hour="*"))
@@ -155,12 +152,12 @@ def check_outdated_campaigns():
     u"""Иногда AdLoad не оповещает GetMyAd об остановке кампании.
         Данная задача проверяет, не произошло ли за последнее время несколько
         таких ошибок и, если произошло, обновляет кампанию."""
-    print 'Check outdate campaigns is start'
+    print('Check outdate campaigns is start')
     elapsed_start_time = datetime.datetime.now()
     db = _mongo_main_db()
     rpc = xmlrpclib.ServerProxy(GETMYAD_XMLRPC_HOST)
     GetmyadCheck().check_outdated_campaigns(db, rpc)
-    print 'Check outdate campaigns is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
+    print('Check outdate campaigns is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
 @periodic_task(run_every=crontab(minute="0", hour="2,8,19"))
@@ -168,21 +165,24 @@ def check_campaigns():
     u"""Иногда AdLoad не оповещает GetMyAd об остановке кампании.
         Данная задача проверяет, не произошло ли за последнее время несколько
         таких ошибок и, если произошло, обновляет кампанию."""
-    print 'Check outdate campaigns is start'
+    print('Check outdate campaigns is start')
     elapsed_start_time = datetime.datetime.now()
     db = _mongo_main_db()
     rpc = xmlrpclib.ServerProxy(GETMYAD_XMLRPC_HOST)
-    GetmyadCheck().check_campaigns(db, rpc)
-    print 'Check outdate campaigns is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
+    check = GetmyadCheck(db, rpc)
+    check.check_campaigns()
+    print('Check outdate campaigns is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
 @periodic_task(run_every=crontab(minute=[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]))
 def check_cdn():
-    print 'Check cdn is start'
+    print('Check cdn is start')
     elapsed_start_time = datetime.datetime.now()
     db = _mongo_main_db()
-    GetmyadCheck().check_cdn(db)
-    print 'Check cdn is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
+    rpc = xmlrpclib.ServerProxy(GETMYAD_XMLRPC_HOST)
+    check = GetmyadCheck(db, rpc)
+    check.check_cdn()
+    print('Check cdn is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
 @periodic_task(run_every=crontab(hour="*", minute="15, 40"))
@@ -190,65 +190,69 @@ def stats_daily_adv_update():
     u"""Обработка (агрегация) статистики"""
     db = _mongo_main_db()
     pool = _mongo_worker_db_pool()
+    stats = GetmyadStats(db, pool)
     # За сегодня
     elapsed_start_time = datetime.datetime.now()
-    print 'Import worker data to stats_daily is start'
-    GetmyadStats().importWorkerBlockData(db, pool)
-    GetmyadStats().importWorkerOfferData(db, pool)
-    #GetmyadStats().importWorkerData(db, pool) #?????????????????
-    print 'Import worker data elapsed %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
-    print 'Count clicks to stats_daily is start'
-    GetmyadStats().importClicksFromMongo(db)
-    print 'Count cliks elapsed %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
-    print 'Update stats_daily_adv is start'
-    GetmyadStats().processMongoStats(db, datetime.date.today())
-    print 'Update stats_daily_adv elapsed %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
-    print 'Agregate stats Domain is start'
+    print('Import worker data to stats_daily is start')
+    stats.importWorkerBlockData()
+    stats.importWorkerOfferData()
+    print('Import worker data elapsed %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
+    print('Count clicks to stats_daily is start')
+    stats.importClicksFromMongo()
+    print('Count cliks elapsed %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
+    print('Update stats_daily_adv is start')
+    stats.processMongoStats(datetime.date.today())
+    print('Update stats_daily_adv elapsed %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
+    print('Agregate stats Domain is start')
     elapsed_start_time = datetime.datetime.now()
-    GetmyadStats().agregateStatDailyDomain(db, datetime.date.today())
-    print 'Agregate stats Domain is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
-    print 'Agregate User stats is start'
+    stats.agregateStatDailyDomain(datetime.date.today())
+    print('Agregate stats Domain is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
+    print('Agregate User stats is start')
     elapsed_start_time = datetime.datetime.now()
-    GetmyadStats().agregateStatDailyUser(db, datetime.date.today())
-    print 'Agregate User stats is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
-    print 'Agregate Daily stats is start'
+    stats.agregateStatDailyUser(datetime.date.today())
+    print('Agregate User stats is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
+    print('Agregate Daily stats is start')
     elapsed_start_time = datetime.datetime.now()
-    GetmyadStats().agregateStatDailyAll(db, datetime.date.today())
-    print 'Agregate Daily stats is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
-    print 'Agregate UserSumary stats is start'
+    stats.agregateStatDailyAll(datetime.date.today())
+    print('Agregate Daily stats is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
+    print('Agregate UserSumary stats is start')
     elapsed_start_time = datetime.datetime.now()
-    GetmyadStats().agregateStatUserSummary(db, datetime.date.today())
-    print 'Agregate UserSumary stats is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
+    stats.agregateStatUserSummary(datetime.date.today())
+    print('Agregate UserSumary stats is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
 @periodic_task(run_every=crontab(hour="5", minute="30"))
 def stats_daily_adv_update_tomoroy():
     u"""Обработка (агрегация) статистики"""
     db = _mongo_main_db()
+    pool = _mongo_worker_db_pool()
+    stats = GetmyadStats(db, pool)
     # За вчера
-    print 'Update stats_daily_adv is start'
+    print('Update stats_daily_adv is start')
     elapsed_start_time = datetime.datetime.now()
-    GetmyadStats().processMongoStats(db, (datetime.date.today() - datetime.timedelta(days=1)))
-    print 'Update stats_daily_adv elapsed %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
-    print 'Agregate stats Domain is start'
+    stats.processMongoStats(datetime.date.today() - datetime.timedelta(days=1))
+    print('Update stats_daily_adv elapsed %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
+    print('Agregate stats Domain is start')
     elapsed_start_time = datetime.datetime.now()
-    GetmyadStats().agregateStatDailyDomain(db, (datetime.date.today() - datetime.timedelta(days=1)))
-    print 'Agregate stats Domain is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
-    print 'Agregate User stats is start'
+    stats.agregateStatDailyDomain(datetime.date.today() - datetime.timedelta(days=1))
+    print('Agregate stats Domain is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
+    print('Agregate User stats is start')
     elapsed_start_time = datetime.datetime.now()
-    GetmyadStats().agregateStatDailyUser(db, (datetime.date.today() - datetime.timedelta(days=1)))
-    print 'Agregate User stats is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
-    print 'Agregate Daily stats is start'
+    stats.agregateStatDailyUser(datetime.date.today() - datetime.timedelta(days=1))
+    print('Agregate User stats is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
+    print('Agregate Daily stats is start')
     elapsed_start_time = datetime.datetime.now()
-    GetmyadStats().agregateStatDailyAll(db, (datetime.date.today() - datetime.timedelta(days=1)))
-    print 'Agregate Daily stats is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
+    stats.agregateStatDailyAll(datetime.date.today() - datetime.timedelta(days=1))
+    print('Agregate Daily stats is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
 @periodic_task(run_every=crontab(minute="0", hour="23"))
 def create_xsl_report():
     u"""Создаёт xls отчёты"""
-    print 'Create XLS report'
+    print('Create XLS report')
     elapsed_start_time = datetime.datetime.now()
     db = _mongo_main_db()
-    GetmyadStats().createCatigoriesDomainReport(db, (datetime.date.today() - datetime.timedelta(days=1)))
-    print 'Create XLS report is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds
+    pool = _mongo_worker_db_pool()
+    stats = GetmyadStats(db, pool)
+    stats.createCatigoriesDomainReport(datetime.date.today() - datetime.timedelta(days=1))
+    print('Create XLS report is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)

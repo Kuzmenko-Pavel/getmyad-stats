@@ -1,25 +1,29 @@
 # -*- coding: utf-8 -*-
+import datetime
 from collections import defaultdict
 
 import bson.objectid
-import datetime
 import pymongo
 
 from mq import MQ
 
 
 class GetmyadRating(object):
-    def importWorkerData(self, db, pool):
+    def __init__(self, db, pool):
+        self.db = db
+        self.pool = pool
+
+    def importWorkerData(self):
         u"""Mongo worker data import"""
         elapsed_start_time = datetime.datetime.now()
         rating_buffer = defaultdict(int)
         campaign_rating_buffer = defaultdict(int)
         filds = {'_id': True, 'id': True, 'inf': True, 'campaignId': True,
                  'id_int': True, 'inf_int': True, 'campaignId_int': True, 'retargeting': True}
-        print "Start import rating Data"
-        for db2 in pool:
+        print("Start import rating Data")
+        for db2 in self.pool:
             try:
-                print db2
+                print(db2)
                 last_processed_id = None
                 try:
                     last_processed_id = db2.config.find_one({'key': 'impressions rating last _id'})['value']
@@ -31,14 +35,13 @@ class GetmyadRating(object):
                 try:
                     cursor = db2['log.impressions'].find({}, filds).sort("$natural", pymongo.DESCENDING)
                 except Exception as e:
-                    print "Cursor ERROR"
-                    print e
+                    print("Cursor ERROR", e)
                     return
                 try:
                     end_id = cursor[0]['_id']  # Последний id, который будет обработан в этот раз
-                    print end_id
+                    print(end_id)
                 except:
-                    print "importImpressionsFromMongo: nothing to do"
+                    print("importImpressionsFromMongo: nothing to do")
                     return
 
                 try:
@@ -58,70 +61,63 @@ class GetmyadRating(object):
                             if not x.get('retargeting', False):
                                 rating_buffer[key_rating] += 1
                         except Exception as e:
-                            print "Iteration error"
-                            print e
+                            print("Iteration error", e)
                             pass
                 except Exception as e:
-                    print "For cursor error"
-                    print e
+                    print("For cursor error", e)
                     pass
-                print "read base complite"
+                print("read base complite")
                 db2.config.update({'key': 'impressions rating last _id'}, {'$set': {'value': end_id}}, True)
             except Exception as e:
-                print "Worker base error"
-                print e
+                print("Worker base error", e)
                 pass
 
-        db.reset_error_history()
+        self.db.reset_error_history()
         for key, value in rating_buffer.iteritems():
             try:
-                db.offer.update({'guid': key[0]},
-                                {'$inc': {'impressions': value, 'full_impressions': value}}, False)
-                db.stats_daily.rating.update({'adv': key[1],
+                self.db.offer.update({'guid': key[0]},
+                                     {'$inc': {'impressions': value, 'full_impressions': value}}, False)
+                self.db.stats_daily.rating.update({'adv': key[1],
                                               'adv_int': key[4],
                                               'guid': key[0],
                                               'guid_int': key[3],
                                               'campaignId': key[2],
                                               'campaignId_int': key[5]
-                                              },
-                                             {'$inc': {'impressions': value, 'full_impressions': value}},
-                                             upsert=True)
-            except Exception, ex:
-                print ex
-                print "rating_buffer"
-                print key, value
+                                                   },
+                                                  {'$inc': {'impressions': value, 'full_impressions': value}},
+                                                  upsert=True)
+            except Exception as ex:
+                print(ex, "rating_buffer", key, value)
 
         for key, value in campaign_rating_buffer.iteritems():
             try:
-                db.campaign.rating.update(
+                self.db.campaign.rating.update(
                     {'adv': key[0], 'adv_int': key[2], 'campaignId': key[1], 'campaignId_int': key[3]},
                     {'$inc': {'impressions': value, 'full_impressions': value}}, True)
-            except Exception, ex:
-                print ex
-                print "campaign_rating_buffer"
-                print key, value
+            except Exception as ex:
+                print(ex, "campaign_rating_buffer", key, value)
         elapsed = (datetime.datetime.now() - elapsed_start_time).seconds
-        print "Stop import rating Data in %s second" % (elapsed,)
-        if db.previous_error():
-            print "Database error", db.previous_error()
+        print("Stop import rating Data in %s second" % elapsed)
+        if self.db.previous_error():
+            print("Database error", self.db.previous_error())
 
-    def importClicksFromMongo(self, db):
+    def importClicksFromMongo(self):
         u"""Обработка кликов из mongo"""
         elapsed_start_time = datetime.datetime.now()
         # _id последней записи, обработанной скриптом. Если не было обработано ничего, равно None 
         last_processed_id = None
         try:
-            last_processed_id = db.config.find_one({'key': 'clicks rating last _id'})['value']
+            last_processed_id = self.db.config.find_one({'key': 'clicks rating last _id'})['value']
         except:
             last_processed_id = None
         if not isinstance(last_processed_id, bson.objectid.ObjectId):
             last_processed_id = None
 
-        cursor = db['clicks'].find().sort("$natural", pymongo.DESCENDING)
+        cursor = self.db['clicks'].find().sort("$natural", pymongo.DESCENDING)
         try:
             end_id = cursor[0]['_id']  # Последний id, который будет обработан в этот раз
         except:
-            print "importClicksFromMongo: nothing to do"
+            print("importClicksFromMongo: nothing to do")
             return
 
         offer_cost = {}
@@ -133,7 +129,7 @@ class GetmyadRating(object):
                 break
             buffer_click.append(x)
 
-        db.config.update({'key': 'clicks rating last _id'}, {'$set': {'value': end_id}}, True)
+        self.db.config.update({'key': 'clicks rating last _id'}, {'$set': {'value': end_id}}, True)
 
         for x in buffer_click:
             processed_records += 1
@@ -141,33 +137,33 @@ class GetmyadRating(object):
             if float(x['adload_cost']) > 0.0:
                 offer_cost[x['offer']] = x['adload_cost']
             if x['unique']:
-                db.offer.update({'guid': x['offer']},
-                                {'$inc': {'clicks': 1, 'full_clicks': 1}}, upsert=False)
+                self.db.offer.update({'guid': x['offer']},
+                                     {'$inc': {'clicks': 1, 'full_clicks': 1}}, upsert=False)
 
-                db.stats_daily.rating.update({'adv': x['inf'],
+                self.db.stats_daily.rating.update({'adv': x['inf'],
                                               'guid': x['offer'],
                                               'campaignId': x['campaignId']},
-                                             {'$inc': {'clicks': 1, 'full_clicks': 1}}, upsert=False)
+                                                  {'$inc': {'clicks': 1, 'full_clicks': 1}}, upsert=False)
 
-                db.campaign.rating.update({'adv': x['inf'], 'campaignId': x['campaignId']},
-                                          {'$inc': {'clicks': 1, 'full_clicks': 1}}, False)
+                self.db.campaign.rating.update({'adv': x['inf'], 'campaignId': x['campaignId']},
+                                               {'$inc': {'clicks': 1, 'full_clicks': 1}}, False)
 
-        print "Finished %s records in %s seconds" % (
-        processed_records, (datetime.datetime.now() - elapsed_start_time).seconds)
+        print("Finished %s records in %s seconds" % (
+            processed_records, (datetime.datetime.now() - elapsed_start_time).seconds))
 
-        print "update offer cost -", len(offer_cost)
+        print("update offer cost - %s" % len(offer_cost))
         for key, value in offer_cost.iteritems():
-            db.offer.update({'guid': key}, {'$set': {'cost': value}}, upsert=False)
+            self.db.offer.update({'guid': key}, {'$set': {'cost': value}}, upsert=False)
 
-    def createOfferRating(self, db):
+    def createOfferRating(self):
         msg = {}
         campaignIdList = [x['guid'] for x in
-                          db.campaign.find({"showConditions.retargeting": False, "status": "working"}, {
+                          self.db.campaign.find({"showConditions.retargeting": False, "status": "working"}, {
                               'guid': 1,
                               '_id': -1
                           })]
         queri = {"campaignId": {"$in": campaignIdList}}
-        offers = db.offer.find(queri)
+        offers = self.db.offer.find(queri)
         offer_count = 0
         offer_skip = 0
         date_update = datetime.datetime.now()
@@ -205,19 +201,19 @@ class GetmyadRating(object):
                 offer_count += 1
                 msg[offer['guid']] = offer['campaignId']
             if len(udata) > 0:
-                db.offer.update({'guid': offer['guid']}, \
-                                {'$set': udata}, upsert=False)
+                self.db.offer.update({'guid': offer['guid']}, \
+                                     {'$set': udata}, upsert=False)
         for key, value in msg.iteritems():
             MQ().offer_update(key, value)
         MQ().offer_rating_update()
-        print "Created %d rating for offer" % (offer_count)
+        print("Created %d rating for offer" % offer_count)
 
-    def createCampaignRatingForInformers(self, db):
+    def createCampaignRatingForInformers(self):
         date_update = datetime.datetime.now()
         costs = defaultdict(list)
-        for item in db.offer.find({}, {'campaignId': True, 'cost': True}):
+        for item in self.db.offer.find({}, {'campaignId': True, 'cost': True}):
             costs[item['campaignId']].append(item['cost'])
-        campaigns = db.campaign.rating.find()
+        campaigns = self.db.campaign.rating.find()
         for campaign in campaigns:
             udata = {}
             impressions = campaign.get('impressions', 0)
@@ -258,15 +254,15 @@ class GetmyadRating(object):
                 udata['last_full_rating_update'] = date_update
 
             if len(udata) > 0:
-                db.campaign.rating.update({'campaignId': campaign['campaignId'],
+                self.db.campaign.rating.update({'campaignId': campaign['campaignId'],
                                            'campaignId_int': campaign['campaignId_int'],
                                            'adv': campaign['adv'],
                                            'adv_int': campaign['adv_int']},
-                                          {'$set': udata}, upsert=False)
+                                               {'$set': udata}, upsert=False)
         MQ().campaign_rating_update()
 
-    def createOfferRatingForInformers(self, db):
-        offers = db.stats_daily.rating.find()
+    def createOfferRatingForInformers(self):
+        offers = self.db.stats_daily.rating.find()
         date_update = datetime.datetime.now()
         offer_count = 0
         offer_skip = 0
@@ -274,7 +270,7 @@ class GetmyadRating(object):
         msg = {}
         informersBySite = {}
         informersByTitle = {}
-        for informer in db.informer.find({}, {'guid': True, 'domain': True, 'title': True}):
+        for informer in self.db.informer.find({}, {'guid': True, 'domain': True, 'title': True}):
             try:
                 informersBySite[informer['guid']] = informer.get('domain', 'NOT DOMAIN')
                 informersByTitle[informer['guid']] = informer.get('title', 'NOT TITLE')
@@ -282,15 +278,16 @@ class GetmyadRating(object):
                 pass
         campaignIdList = []
         campaign = {}
-        for x in db.campaign.find({"showConditions.retargeting": False, "status": "working"}, {'guid': 1, 'title': 1, '_id': -1}):
+        for x in self.db.campaign.find({"showConditions.retargeting": False, "status": "working"},
+                                       {'guid': 1, 'title': 1, '_id': -1}):
             campaignIdList.append(x['guid'])
             campaign[x['guid']] = x['title']
 
         queri = {"campaignId": {"$in": campaignIdList}}
-        for item in db.offer.find(queri, {'guid': 1, 'cost': 1, 'title': 1, '_id':-1}):
+        for item in self.db.offer.find(queri, {'guid': 1, 'cost': 1, 'title': 1, '_id': -1}):
             costs[item['guid']] = [item['cost'], item['title']]
 
-        offers = db.stats_daily.rating.find(queri)
+        offers = self.db.stats_daily.rating.find(queri)
         for offer in offers:
             udata = {}
             impressions = offer.get('impressions', 0)
@@ -341,63 +338,58 @@ class GetmyadRating(object):
                 udata['title'] = offer_title
                 udata['campaignTitle'] = campaignTitle
             if len(udata) > 0:
-                db.stats_daily.rating.update({'guid': offer['guid'],
+                self.db.stats_daily.rating.update({'guid': offer['guid'],
                                               'guid_int': offer['guid_int'],
                                               'campaignId': offer['campaignId'],
                                               'campaignId_int': offer['campaignId_int'],
                                               'adv': offer['adv'],
                                               'adv_int': offer['adv_int']},
-                                             {'$set': udata}, upsert=False)
+                                                  {'$set': udata}, upsert=False)
 
         for key, value in msg.iteritems():
             MQ().rating_informer_update(value)
         MQ().informer_rating_update()
-        print "Created %d rating for offer-informer" % (offer_count)
+        print("Created %d rating for offer-informer" % offer_count)
 
-    def delete_old_rating_stats(self, db):
+    def delete_old_rating_stats(self):
         u"""Удаляем старую статистику"""
         offersId = []
-        campaignIdList = [x['guid'] for x in db.campaign.find({"showConditions.retargeting": False})]
-        informerIdList = [x['guid'] for x in db.informer.find({})]
-        print informerIdList
+        campaignIdList = [x['guid'] for x in self.db.campaign.find({"showConditions.retargeting": False})]
+        informerIdList = [x['guid'] for x in self.db.informer.find({})]
+        print(informerIdList)
         queri = {"campaignId": {"$in": campaignIdList}}
-        for item in db.offer.find(queri, {"guid": 1, "_id": 0}):
+        for item in self.db.offer.find(queri, {"guid": 1, "_id": 0}):
             offersId.append(item['guid'])
         a = 0
         i = 0
         y = 0
         d = 0
         z = 0
-        a = db.stats_daily.rating.remove({'adv': {'$nin': informerIdList}})
-        i = db.stats_daily.rating.remove({'guid': {'$nin': offersId}})
-        d = db.stats_daily.rating.remove({'full_rating': 0})
+        a = self.db.stats_daily.rating.remove({'adv': {'$nin': informerIdList}})
+        i = self.db.stats_daily.rating.remove({'guid': {'$nin': offersId}})
+        d = self.db.stats_daily.rating.remove({'full_rating': 0})
         # Сбрасуем показы и клики в товарах
-        y = db.offer.update({'$or': [{'impressions': {'$lte': 0}}, {'impressions': {'$gte': 1500}},
-                                     {'impressions': {'$exists': False}}]},
-                            {'$set': {'impressions': 0,
+        y = self.db.offer.update({'$or': [{'impressions': {'$lte': 0}}, {'impressions': {'$gte': 1500}},
+                                          {'impressions': {'$exists': False}}]},
+                                 {'$set': {'impressions': 0,
                                       'clicks': 0}}, multi=True, w=1)
         # Сбрасуем показы и клики в товарах по рекламному блоку
-        z = db.stats_daily.rating.update({'$or': [{'impressions': {'$lte': 0}}, {'impressions': {'$gte': 1500}},
-                                                  {'impressions': {'$exists': False}}]},
-                                         {'$set': {'impressions': 0,
+        z = self.db.stats_daily.rating.update({'$or': [{'impressions': {'$lte': 0}}, {'impressions': {'$gte': 1500}},
+                                                       {'impressions': {'$exists': False}}]},
+                                              {'$set': {'impressions': 0,
                                                    'clicks': 0}}, multi=True, w=1)
 
-        print "records deleted"
-        print i
-        print "records offer/inf 0 rating deleted"
-        print d
-        print "records inf rating deleted"
-        print a
-        print "clearn offer imp/click"
-        print y
-        print "clearn offer/inf imp/click"
-        print z
+        print("records deleted %s" % i)
+        print("records offer/inf 0 rating deleted %s" % d)
+        print("records inf rating deleted %s" % a)
+        print("clearn offer imp/click %s" % y)
+        print("clearn offer/inf imp/click %s" % z)
 
-    def trunkete_rating_stats(self, db):
+    def trunkete_rating_stats(self):
         u"""Обризаем показы"""
         of_im = 1000000
         of_inf_im = 250000
-        for item in db.offer.find({'full_impressions': {'$gte': of_im * 4}, 'retargeting': False}):
+        for item in self.db.offer.find({'full_impressions': {'$gte': of_im * 4}, 'retargeting': False}):
             full_impressions = item.get('full_impressions', 0)
             full_clicks = item.get('full_clicks', 0)
             delta = full_impressions / of_im
@@ -405,14 +397,14 @@ class GetmyadRating(object):
                 propor = (float(full_clicks) / full_impressions)
             else:
                 item['full_impressions'] = of_im * 3
-                db.offer.save(item)
+                self.db.offer.save(item)
                 continue
 
             item['full_impressions'] = of_im * 3
             item['full_clicks'] = int(propor * of_im * 3)
-            db.offer.save(item)
+            self.db.offer.save(item)
 
-        for item in db.stats_daily.rating.find({'full_impressions': {'$gte': of_inf_im * 4}}):
+        for item in self.db.stats_daily.rating.find({'full_impressions': {'$gte': of_inf_im * 4}}):
             full_impressions = item.get('full_impressions', 0)
             full_clicks = item.get('full_clicks', 0)
             delta = full_impressions / of_im
@@ -420,9 +412,9 @@ class GetmyadRating(object):
                 propor = (float(full_clicks) / full_impressions)
             else:
                 item['full_impressions'] = of_inf_im * 4
-                db.stats_daily.rating.save(item)
+                self.db.stats_daily.rating.save(item)
                 continue
 
             item['full_impressions'] = of_inf_im * 4
             item['full_clicks'] = int(propor * of_inf_im * 4)
-            db.stats_daily.rating.save(item)
+            self.db.stats_daily.rating.save(item)
