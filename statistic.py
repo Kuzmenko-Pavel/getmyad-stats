@@ -7,6 +7,7 @@ import socket
 import bson.objectid
 import pymongo
 import xlwt
+from pymongo.errors import BulkWriteError
 
 
 class GetmyadStats(object):
@@ -37,13 +38,13 @@ class GetmyadStats(object):
                                                                     '_id': True}).sort("$natural", pymongo.DESCENDING)
                 except Exception as e:
                     print("Cursor ERROR", e)
-                    return
+                    continue
                 try:
                     end_id = cursor[0]['_id']  # Последний id, который будет обработан в этот раз
                     print(end_id)
                 except Exception as e:
                     print("importImpressionsFromMongo: nothing to do")
-                    return
+                    continue
 
                 try:
                     for x in cursor:
@@ -119,7 +120,6 @@ class GetmyadStats(object):
         for db2 in self.pool:
             try:
                 print(db2)
-                last_processed_id = None
                 try:
                     last_processed_id = db2.config.find_one({'key': 'impressions offer last _id'})['value']
                 except:
@@ -132,13 +132,13 @@ class GetmyadStats(object):
                                                                                                             pymongo.DESCENDING)
                 except Exception as e:
                     print("Cursor ERROR", e)
-                    return
+                    continue
                 try:
                     end_id = cursor[0]['_id']  # Последний id, который будет обработан в этот раз
                     print(end_id)
                 except Exception as e:
                     print("importImpressionsFromMongo: nothing to do")
-                    return
+                    continue
 
                 try:
                     for x in cursor:
@@ -292,13 +292,10 @@ class GetmyadStats(object):
     def processMongoStats(self, date):
         date = datetime.datetime(date.year, date.month, date.day, 0, 0)
         informersBySite = {}
-        informersByItemsNumber = {}
         informersByUsers = {}
         informersByTitle = {}
         informerList = []
-        for informer in self.db.informer.find({},
-                                              {'guid': True, 'domain': True, 'admaker': True, 'user': True,
-                                               'title': True}):
+        for informer in self.db.informer.find({}, {'guid': True, 'domain': True, 'user': True, 'title': True}):
             try:
                 userGuid = self.db.users.find_one({"login": informer.get('user', 'NOT DOMAIN')}, {'guid': 1, '_id': 0})
                 domainGuid = None
@@ -308,49 +305,59 @@ class GetmyadStats(object):
                         if value == informer.get('domain', 'NOT DOMAIN'):
                             domainGuid = key
                 informersBySite[informer['guid']] = (informer.get('domain', 'NOT DOMAIN'), domainGuid)
-                informersByItemsNumber[informer['guid']] = informer.get('admaker', {}).get('Main', {}).get(
-                    'itemsNumber', 4)
                 informersByUsers[informer['guid']] = (informer.get('user', 'NOT DOMAIN'), userGuid.get('guid', ''))
                 informersByTitle[informer['guid']] = informer.get('title', 'NOT DOMAIN')
                 informerList.append(informer['guid'])
             except:
                 pass
-        informers = self.db.stats.daily.raw.group(
 
-            key=['date', 'guid'],
-            condition={'date': {'$gte': date,
-                                '$lt': date + datetime.timedelta(days=1)}},
-            reduce='''function(obj,prev) {
-                                                prev.totalCost += obj.totalCost || 0;
-                                                prev.adload_cost += obj.adload_cost || 0;
-                                                prev.income += obj.income || 0;
-                                                prev.impressions_block += obj.impressions_block || 0;
-                                                prev.impressions_block_not_valid += obj.impressions_block_not_valid || 0;
-                                                prev.impressions += obj.impressions || 0;
-                                                prev.clicks += obj.clicks || 0;
-                                                prev.clicksUnique += obj.clicksUnique || 0;
-                                                prev.social_impressions += obj.social_impressions || 0;
-                                                prev.social_clicks += obj.social_clicks || 0;
-                                                prev.social_clicksUnique += obj.social_clicksUnique || 0;
-                                                prev.view_seconds += obj.view_seconds || 0;
-                                               }''',
-            initial={'totalCost': 0,
-                     'adload_cost': 0,
-                     'income': 0,
-                     'impressions_block': 0,
-                     'impressions_block_not_valid': 0,
-                     'impressions': 0,
-                     'clicks': 0,
-                     'clicksUnique': 0,
-                     'social_impressions': 0,
-                     'social_clicks': 0,
-                     'social_clicksUnique': 0,
-                     'view_seconds': 0}
-        )
-        for inf in informers:
-            if inf['guid'] not in informerList:
-                print("Not found informer %s" % inf['guid'])
+        pipeline = [
+            {'$match':
+                {
+                    'date': {'$gte': date, '$lt': date + datetime.timedelta(days=1)}
+                }
+            },
+            {'$group':
+                {
+                    '_id': {
+                        'date': '$date',
+                        'guid': '$guid'
+                    },
+                    'totalCost': {'$sum': '$totalCost'},
+                    'adload_cost': {'$sum': '$adload_cost'},
+                    'income': {'$sum': '$income'},
+                    'impressions_block': {'$sum': '$impressions_block'},
+                    'impressions_block_not_valid': {'$sum': '$impressions_block_not_valid'},
+                    'impressions': {'$sum': '$impressions'},
+                    'clicks': {'$sum': '$clicks'},
+                    'clicksUnique': {'$sum': '$clicksUnique'},
+                    'social_impressions': {'$sum': '$social_impressions'},
+                    'social_clicks': {'$sum': '$social_clicks'},
+                    'social_clicksUnique': {'$sum': '$social_clicksUnique'},
+                    'view_seconds': {'$sum': '$view_seconds'},
+                }
+            }
+        ]
+        cursor = self.db.stats.daily.raw.aggregate(pipeline=pipeline, allowDiskUse=True, useCursor=True)
+        bulk = self.db.stats.daily.adv.initialize_unordered_bulk_op()
+        for inf in cursor:
+            guid = inf['_id']['guid']
+            if guid not in informerList:
+                print("Not found informer %s" % guid)
                 continue
+
+            date = inf['_id']['date']
+            domain = informersBySite.get(guid, 'NOT DOMAIN')[0]
+            domain_guid = informersBySite.get(guid, 'NOT DOMAIN')[1]
+            user = informersByUsers.get(guid, 'not user')[0]
+            user_guid = informersByUsers.get(guid, 'not user')[1]
+            title = informersByTitle.get(guid, 'NOT TITLE')
+            totalCost = inf['totalCost']
+            adload_cost = inf['adload_cost']
+            income = inf['income']
+            clicks = inf['clicks']
+            social_clicks = inf['social_clicks']
+            view_seconds = inf['view_seconds']
 
             impressions = int(inf['impressions'])
             social_impressions = int(inf['social_impressions'])
@@ -368,34 +375,39 @@ class GetmyadStats(object):
                 social_clicksUnique > 0 and social_impressions > 0) else 0
             ctr_difference_impressions = 100.0 * ctr_social_impressions / ctr_impressions if (
                 ctr_social_impressions > 0 and ctr_impressions > 0) else 0
-            self.db.stats.daily.adv.update(
-                {'adv': inf['guid'], 'date': inf['date']},
-                {'$set': {'domain': informersBySite.get(inf['guid'], 'NOT DOMAIN')[0],
-                          'domain_guid': informersBySite.get(inf['guid'], 'NOT DOMAIN')[1],
-                          'user': informersByUsers.get(inf['guid'], 'not user')[0],
-                          'user_guid': informersByUsers.get(inf['guid'], 'not user')[1],
-                          'title': informersByTitle.get(inf['guid'], 'NOT TITLE'),
+
+            bulk.find({'adv': guid, 'date': date}).upsert().update_one(
+                {'$set': {'domain': domain,
+                          'domain_guid': domain_guid,
+                          'user': user,
+                          'user_guid': user_guid,
+                          'title': title,
                           'impressions_block': impressions_block,
                           'impressions_block_not_valid': impressions_block_not_valid,
                           'difference_impressions_block': difference_impressions_block,
-                          'totalCost': inf['totalCost'],
-                          'adload_cost': inf['adload_cost'],
-                          'income': inf['income'],
+                          'totalCost': totalCost,
+                          'adload_cost': adload_cost,
+                          'income': income,
                           'impressions': impressions,
-                          'clicks': inf['clicks'],
+                          'clicks': clicks,
                           'clicksUnique': clicksUnique,
                           'social_impressions': social_impressions,
-                          'social_clicks': inf['social_clicks'],
+                          'social_clicks': social_clicks,
                           'social_clicksUnique': social_clicksUnique,
                           'ctr_impressions_block': ctr_impressions_block,
                           'ctr_impressions': ctr_impressions,
                           'ctr_social_impressions': ctr_social_impressions,
                           'ctr_difference_impressions': ctr_difference_impressions,
-                          'view_seconds': inf['view_seconds']
-                          }},
-                upsert=True)
+                          'view_seconds': view_seconds
+                          }
+                 }
+            )
 
         # Обновляем время обработки статистики
+        try:
+            bulk.execute()
+        except BulkWriteError as e:
+            print(e.details)
         self.db.config.update({'key': 'last stats_daily update date'},
                               {'$set': {'value': datetime.datetime.now()}}, upsert=True)
 
@@ -405,44 +417,44 @@ class GetmyadStats(object):
             ``date`` --- дата, на которую считать данные. Может быть типа datetime или date"""
         assert isinstance(date, (datetime.datetime, datetime.date))
         date = datetime.datetime(date.year, date.month, date.day, 0, 0)
-        summary = self.db.stats.daily.adv.group(
-            key=['date', 'domain', 'domain_guid'],
-            condition={'date': {'$gte': date,
-                                '$lt': date + datetime.timedelta(days=1)}},
-            reduce='''
-                function(o, p) {
-                   p.user = o.user || '';
-                   p.user_guid = o.user_guid  || '';
-                   p.impressions_block += o.impressions_block || 0;
-                   p.impressions_block_not_valid += o.impressions_block_not_valid || 0;
-                   p.impressions += o.impressions || 0;
-                   p.clicks += o.clicks || 0;
-                   p.clicksUnique += o.clicksUnique || 0;
-                   p.social_impressions += o.social_impressions || 0;
-                   p.social_clicks += o.social_clicks || 0;
-                   p.social_clicksUnique += o.social_clicksUnique || 0;
-                   p.view_seconds += o.view_seconds || 0;
-                   p.totalCost += o.totalCost || 0;
-                   p.adload_cost += o.adload_cost || 0;
-                   p.income += o.income || 0;
-                }''',
-            initial={'user': '',
-                     'user_guid': '',
-                     'totalCost': 0,
-                     'adload_cost': 0,
-                     'income': 0,
-                     'impressions_block': 0,
-                     'impressions_block_not_valid': 0,
-                     'impressions': 0,
-                     'clicks': 0,
-                     'clicksUnique': 0,
-                     'social_impressions': 0,
-                     'social_clicks': 0,
-                     'social_clicksUnique': 0,
-                     'view_seconds': 0
-                     }
-        )
-        for x in summary:
+
+        pipeline = [
+            {'$match':
+                {
+                    'date': {'$gte': date, '$lt': date + datetime.timedelta(days=1)}
+                }
+            },
+            {'$group':
+                {
+                    '_id': {
+                        'date': '$date',
+                        'domain': '$domain',
+                        'domain_guid': '$domain_guid'
+                    },
+                    'user': {'$last': '$user'},
+                    'user_guid': {'$last': '$user_guid'},
+                    'totalCost': {'$sum': '$totalCost'},
+                    'adload_cost': {'$sum': '$adload_cost'},
+                    'income': {'$sum': '$income'},
+                    'impressions_block': {'$sum': '$impressions_block'},
+                    'impressions_block_not_valid': {'$sum': '$impressions_block_not_valid'},
+                    'impressions': {'$sum': '$impressions'},
+                    'clicks': {'$sum': '$clicks'},
+                    'clicksUnique': {'$sum': '$clicksUnique'},
+                    'social_impressions': {'$sum': '$social_impressions'},
+                    'social_clicks': {'$sum': '$social_clicks'},
+                    'social_clicksUnique': {'$sum': '$social_clicksUnique'},
+                    'view_seconds': {'$sum': '$view_seconds'}
+                }
+            }
+        ]
+
+        cursor = self.db.stats.daily.adv.aggregate(pipeline=pipeline, allowDiskUse=True, useCursor=True)
+        bulk = self.db.stats.daily.domain.initialize_unordered_bulk_op()
+        for x in cursor:
+            date = x['_id']['date']
+            domain = x['_id']['domain']
+            domain_guid = x['_id']['domain_guid']
             impressions_block = int(x['impressions_block'])
             impressions_block_not_valid = int(x['impressions_block_not_valid'])
             difference_impressions_block = 100.0 * impressions_block / impressions_block_not_valid if (
@@ -458,30 +470,33 @@ class GetmyadStats(object):
                 social_clicksUnique > 0 and social_impressions > 0) else 0
             ctr_difference_impressions = 100.0 * ctr_social_impressions / ctr_impressions if (
                 ctr_social_impressions > 0 and ctr_impressions > 0) else 0
-            self.db.stats.daily.domain.update({'date': x['date'],
-                                               'domain': x['domain'],
-                                               'domain_guid': x['domain_guid']},
-                                              {'$set': {'user': x['user'],
-                                                        'user_guid': x['user_guid'],
-                                                        'totalCost': x['totalCost'],
-                                                        'adload_cost': x['adload_cost'],
-                                                        'income': x['income'],
-                                                        'impressions_block': impressions_block,
-                                                        'impressions_block_not_valid': impressions_block_not_valid,
-                                                        'difference_impressions_block': difference_impressions_block,
-                                                        'impressions': impressions,
-                                                        'clicks': x['clicks'],
-                                                        'clicksUnique': clicksUnique,
-                                                        'social_impressions': social_impressions,
-                                                        'social_clicks': x['social_clicks'],
-                                                        'social_clicksUnique': social_clicksUnique,
-                                                        'ctr_impressions_block': ctr_impressions_block,
-                                                        'ctr_impressions': ctr_impressions,
-                                                        'ctr_social_impressions': ctr_social_impressions,
-                                                        'ctr_difference_impressions': ctr_difference_impressions,
-                                                        'view_seconds': x['view_seconds']
-                                                        }},
-                                              upsert=True)
+            bulk.find({'domain': domain, 'date': date, 'domain_guid': domain_guid}).upsert().update_one(
+                {'$set': {'user': x['user'],
+                          'user_guid': x['user_guid'],
+                          'totalCost': x['totalCost'],
+                          'adload_cost': x['adload_cost'],
+                          'income': x['income'],
+                          'impressions_block': impressions_block,
+                          'impressions_block_not_valid': impressions_block_not_valid,
+                          'difference_impressions_block': difference_impressions_block,
+                          'impressions': impressions,
+                          'clicks': x['clicks'],
+                          'clicksUnique': clicksUnique,
+                          'social_impressions': social_impressions,
+                          'social_clicks': x['social_clicks'],
+                          'social_clicksUnique': social_clicksUnique,
+                          'ctr_impressions_block': ctr_impressions_block,
+                          'ctr_impressions': ctr_impressions,
+                          'ctr_social_impressions': ctr_social_impressions,
+                          'ctr_difference_impressions': ctr_difference_impressions,
+                          'view_seconds': x['view_seconds']
+                          }}
+            )
+
+        try:
+            bulk.execute()
+        except BulkWriteError as e:
+            print(e.details)
 
     def agregateStatDailyUser(self, date):
         u"""Составляет общую статистику по доменам с разбивкой по датам.
@@ -489,40 +504,41 @@ class GetmyadStats(object):
             ``date`` --- дата, на которую считать данные. Может быть типа datetime или date"""
         assert isinstance(date, (datetime.datetime, datetime.date))
         date = datetime.datetime(date.year, date.month, date.day, 0, 0)
-        summary = self.db.stats.daily.domain.group(
-            key=['date', 'user', 'user_guid'],
-            condition={'date': {'$gte': date,
-                                '$lt': date + datetime.timedelta(days=1)}},
-            reduce='''
-                function(o, p) {
-                   p.impressions_block += o.impressions_block || 0;
-                   p.impressions_block_not_valid += o.impressions_block_not_valid || 0;
-                   p.impressions += o.impressions || 0;
-                   p.clicks += o.clicks || 0;
-                   p.clicksUnique += o.clicksUnique || 0;
-                   p.social_impressions += o.social_impressions || 0;
-                   p.social_clicks += o.social_clicks || 0;
-                   p.social_clicksUnique += o.social_clicksUnique || 0;
-                   p.view_seconds += o.view_seconds || 0;
-                   p.totalCost += o.totalCost || 0;
-                   p.adload_cost += o.adload_cost || 0;
-                   p.income += o.income || 0;
-                }''',
-            initial={'totalCost': 0,
-                     'adload_cost': 0,
-                     'income': 0,
-                     'impressions_block': 0,
-                     'impressions_block_not_valid': 0,
-                     'impressions': 0,
-                     'clicks': 0,
-                     'clicksUnique': 0,
-                     'social_impressions': 0,
-                     'social_clicks': 0,
-                     'social_clicksUnique': 0,
-                     'view_seconds': 0
-                     }
-        )
-        for x in summary:
+        pipeline = [
+            {'$match':
+                {
+                    'date': {'$gte': date, '$lt': date + datetime.timedelta(days=1)}
+                }
+            },
+            {'$group':
+                {
+                    '_id': {
+                        'date': '$date',
+                        'user': '$user',
+                        'user_guid': '$user_guid'
+                    },
+                    'totalCost': {'$sum': '$totalCost'},
+                    'adload_cost': {'$sum': '$adload_cost'},
+                    'income': {'$sum': '$income'},
+                    'impressions_block': {'$sum': '$impressions_block'},
+                    'impressions_block_not_valid': {'$sum': '$impressions_block_not_valid'},
+                    'impressions': {'$sum': '$impressions'},
+                    'clicks': {'$sum': '$clicks'},
+                    'clicksUnique': {'$sum': '$clicksUnique'},
+                    'social_impressions': {'$sum': '$social_impressions'},
+                    'social_clicks': {'$sum': '$social_clicks'},
+                    'social_clicksUnique': {'$sum': '$social_clicksUnique'},
+                    'view_seconds': {'$sum': '$view_seconds'}
+                }
+            }
+        ]
+        cursor = self.db.stats.daily.domain.aggregate(pipeline=pipeline, allowDiskUse=True, useCursor=True)
+        bulk = self.db.stats.daily.user.initialize_unordered_bulk_op()
+
+        for x in cursor:
+            date = x['_id']['date']
+            user = x['_id']['user']
+            user_guid = x['_id']['user_guid']
             impressions_block = int(x['impressions_block'])
             impressions_block_not_valid = int(x['impressions_block_not_valid'])
             difference_impressions_block = 100.0 * impressions_block / impressions_block_not_valid if (
@@ -538,28 +554,33 @@ class GetmyadStats(object):
                 social_clicksUnique > 0 and social_impressions > 0) else 0
             ctr_difference_impressions = 100.0 * ctr_social_impressions / ctr_impressions if (
                 ctr_social_impressions > 0 and ctr_impressions > 0) else 0
-            self.db.stats.daily.user.update({'date': x['date'],
-                                             'user': x['user'],
-                                             'user_guid': x['user_guid']},
-                                            {'$set': {'totalCost': x['totalCost'],
-                                                      'adload_cost': x['adload_cost'],
-                                                      'income': x['income'],
-                                                      'impressions_block': impressions_block,
-                                                      'impressions_block_not_valid': impressions_block_not_valid,
-                                                      'difference_impressions_block': difference_impressions_block,
-                                                      'impressions': impressions,
-                                                      'clicks': x['clicks'],
-                                                      'clicksUnique': clicksUnique,
-                                                      'social_impressions': social_impressions,
-                                                      'social_clicks': x['social_clicks'],
-                                                      'social_clicksUnique': social_clicksUnique,
-                                                      'ctr_impressions_block': ctr_impressions_block,
-                                                      'ctr_impressions': ctr_impressions,
-                                                      'ctr_social_impressions': ctr_social_impressions,
-                                                      'ctr_difference_impressions': ctr_difference_impressions,
-                                                      'view_seconds': x['view_seconds']
-                                                      }},
-                                            upsert=True)
+
+            bulk.find({'user': user, 'date': date, 'user_guid': user_guid}).upsert().update_one(
+                {'$set': {'totalCost': x['totalCost'],
+                          'adload_cost': x['adload_cost'],
+                          'income': x['income'],
+                          'impressions_block': impressions_block,
+                          'impressions_block_not_valid': impressions_block_not_valid,
+                          'difference_impressions_block': difference_impressions_block,
+                          'impressions': impressions,
+                          'clicks': x['clicks'],
+                          'clicksUnique': clicksUnique,
+                          'social_impressions': social_impressions,
+                          'social_clicks': x['social_clicks'],
+                          'social_clicksUnique': social_clicksUnique,
+                          'ctr_impressions_block': ctr_impressions_block,
+                          'ctr_impressions': ctr_impressions,
+                          'ctr_social_impressions': ctr_social_impressions,
+                          'ctr_difference_impressions': ctr_difference_impressions,
+                          'view_seconds': x['view_seconds']
+                          }}
+
+            )
+
+        try:
+            bulk.execute()
+        except BulkWriteError as e:
+            print(e.details)
 
     def agregateStatDailyAll(self, date):
         u"""Составляет общую статистику по доменам с разбивкой по датам.
@@ -567,40 +588,38 @@ class GetmyadStats(object):
             ``date`` --- дата, на которую считать данные. Может быть типа datetime или date"""
         assert isinstance(date, (datetime.datetime, datetime.date))
         date = datetime.datetime(date.year, date.month, date.day, 0, 0)
-        summary = self.db.stats.daily.user.group(
-            key=['date'],
-            condition={'date': {'$gte': date,
-                                '$lt': date + datetime.timedelta(days=1)}},
-            reduce='''
-                function(o, p) {
-                   p.impressions_block += o.impressions_block || 0;
-                   p.impressions_block_not_valid += o.impressions_block_not_valid || 0;
-                   p.impressions += o.impressions || 0;
-                   p.clicks += o.clicks || 0;
-                   p.clicksUnique += o.clicksUnique || 0;
-                   p.social_impressions += o.social_impressions || 0;
-                   p.social_clicks += o.social_clicks || 0;
-                   p.social_clicksUnique += o.social_clicksUnique || 0;
-                   p.view_seconds += o.view_seconds || 0;
-                   p.totalCost += o.totalCost || 0;
-                   p.adload_cost += o.adload_cost || 0;
-                   p.income += o.income || 0;
-                }''',
-            initial={'totalCost': 0,
-                     'adload_cost': 0,
-                     'income': 0,
-                     'impressions_block': 0,
-                     'impressions_block_not_valid': 0,
-                     'impressions': 0,
-                     'clicks': 0,
-                     'clicksUnique': 0,
-                     'social_impressions': 0,
-                     'social_clicks': 0,
-                     'social_clicksUnique': 0,
-                     'view_seconds': 0
-                     }
-        )
-        for x in summary:
+
+        pipeline = [
+            {'$match':
+                {
+                    'date': {'$gte': date, '$lt': date + datetime.timedelta(days=1)}
+                }
+            },
+            {'$group':
+                {
+                    '_id': {
+                        'date': '$date'
+                    },
+                    'totalCost': {'$sum': '$totalCost'},
+                    'adload_cost': {'$sum': '$adload_cost'},
+                    'income': {'$sum': '$income'},
+                    'impressions_block': {'$sum': '$impressions_block'},
+                    'impressions_block_not_valid': {'$sum': '$impressions_block_not_valid'},
+                    'impressions': {'$sum': '$impressions'},
+                    'clicks': {'$sum': '$clicks'},
+                    'clicksUnique': {'$sum': '$clicksUnique'},
+                    'social_impressions': {'$sum': '$social_impressions'},
+                    'social_clicks': {'$sum': '$social_clicks'},
+                    'social_clicksUnique': {'$sum': '$social_clicksUnique'},
+                    'view_seconds': {'$sum': '$view_seconds'}
+                }
+            }
+        ]
+        cursor = self.db.stats.daily.user.aggregate(pipeline=pipeline, allowDiskUse=True, useCursor=True)
+        bulk = self.db.stats.daily.all.initialize_unordered_bulk_op()
+
+        for x in cursor:
+            date = x['_id']['date']
             impressions_block = int(x['impressions_block'])
             impressions_block_not_valid = int(x['impressions_block_not_valid'])
             difference_impressions_block = 100.0 * impressions_block / impressions_block_not_valid if (
@@ -616,26 +635,31 @@ class GetmyadStats(object):
                 social_clicksUnique > 0 and social_impressions > 0) else 0
             ctr_difference_impressions = 100.0 * ctr_social_impressions / ctr_impressions if (
                 ctr_social_impressions > 0 and ctr_impressions > 0) else 0
-            self.db.stats.daily.all.update({'date': x['date']},
-                                           {'$set': {'totalCost': x['totalCost'],
-                                                     'adload_cost': x['adload_cost'],
-                                                     'income': x['income'],
-                                                     'impressions_block': impressions_block,
-                                                     'impressions_block_not_valid': impressions_block_not_valid,
-                                                     'difference_impressions_block': difference_impressions_block,
-                                                     'impressions': impressions,
-                                                     'clicks': x['clicks'],
-                                                     'clicksUnique': clicksUnique,
-                                                     'social_impressions': social_impressions,
-                                                     'social_clicks': x['social_clicks'],
-                                                     'social_clicksUnique': social_clicksUnique,
-                                                     'ctr_impressions_block': ctr_impressions_block,
-                                                     'ctr_impressions': ctr_impressions,
-                                                     'ctr_social_impressions': ctr_social_impressions,
-                                                     'ctr_difference_impressions': ctr_difference_impressions,
-                                                     'view_seconds': x['view_seconds']
-                                                     }},
-                                           upsert=True)
+            bulk.find({'date': date}).upsert().update_one(
+                {'$set': {'totalCost': x['totalCost'],
+                          'adload_cost': x['adload_cost'],
+                          'income': x['income'],
+                          'impressions_block': impressions_block,
+                          'impressions_block_not_valid': impressions_block_not_valid,
+                          'difference_impressions_block': difference_impressions_block,
+                          'impressions': impressions,
+                          'clicks': x['clicks'],
+                          'clicksUnique': clicksUnique,
+                          'social_impressions': social_impressions,
+                          'social_clicks': x['social_clicks'],
+                          'social_clicksUnique': social_clicksUnique,
+                          'ctr_impressions_block': ctr_impressions_block,
+                          'ctr_impressions': ctr_impressions,
+                          'ctr_social_impressions': ctr_social_impressions,
+                          'ctr_difference_impressions': ctr_difference_impressions,
+                          'view_seconds': x['view_seconds']
+                          }}
+            )
+
+        try:
+            bulk.execute()
+        except BulkWriteError as e:
+            print(e.details)
 
     def agregateStatUserSummary(self, date):
         u"""Составляет общую статистику по доменам с разбивкой по датам.

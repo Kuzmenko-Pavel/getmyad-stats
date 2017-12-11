@@ -37,13 +37,13 @@ class GetmyadRating(object):
                     cursor = db2['log.impressions'].find({}, filds).sort("$natural", pymongo.DESCENDING)
                 except Exception as e:
                     print("Cursor ERROR", e)
-                    return
+                    continue
                 try:
                     end_id = cursor[0]['_id']  # Последний id, который будет обработан в этот раз
                     print(end_id)
                 except:
                     print("importImpressionsFromMongo: nothing to do")
-                    return
+                    continue
 
                 try:
                     for x in cursor:

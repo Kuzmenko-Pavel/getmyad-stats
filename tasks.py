@@ -15,9 +15,7 @@ from statistic import GetmyadStats
 GETMYAD_XMLRPC_HOST = 'https://getmyad.yottos.com/rpc'
 MONGO_HOST = 'srv-5.yottos.com:27018,srv-5.yottos.com:27019,srv-5.yottos.com:27020'
 MONGO_DATABASE = 'getmyad_db'
-MONGO_WORKER_HOST_POOL = ['srv-2.yottos.loc:27017', ]
-MONGO_WORKER_DATABASE = 'getmyad'
-
+MONGO_WORKER_HOST_POOL = ['srv-2.yottos.com:27017', ]
 
 def _mongo_connection(host):
     u"""Возвращает Connection к серверу MongoDB"""
@@ -32,16 +30,22 @@ def _mongo_connection(host):
 
 
 def _mongo_main_db():
-    u"""Возвращает подключение к базе данных MongoDB"""
+    """Возвращает подключение к базе данных MongoDB"""
     return _mongo_connection(MONGO_HOST)[MONGO_DATABASE]
 
 
 def _mongo_worker_db_pool():
-    u"""Возвращает подключение к базе данных MongoDB"""
+    """Возвращает подключение к базе данных MongoDB Worker"""
     pool = []
+    now = datetime.datetime.now()
+    first_db = 'rg_%s' % now.hour
+    second_db = 'rg_%s' % (now - datetime.timedelta(minutes=60)).hour
+    mongo_worker_database = list([first_db, second_db])
+    mongo_worker_database.append('getmyad')
     for host in MONGO_WORKER_HOST_POOL:
         try:
-            pool.append(_mongo_connection(host)[MONGO_WORKER_DATABASE])
+            for base_name in mongo_worker_database:
+                pool.append(_mongo_connection(host)[base_name])
         except Exception as e:
             print(e, host)
     return pool
