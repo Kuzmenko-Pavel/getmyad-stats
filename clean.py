@@ -37,10 +37,5 @@ class GetmyadClean():
                                              reduce='function(obj,prev){}',
                                              initial={})
         campaign_id = map(lambda x: x['guid'], campaign_id)
-        count = 0
-        for x in self.db.offer.find():
-            if x['campaignId'] not in campaign_id:
-                print("Delete offer guid : %s" % x)
-                self.db.offer.remove(x)
-                count += 1
-        print("Deleted %s offers" % count)
+        result = self.db.offer.delete_many({'campaignId': {'$nin': campaign_id}})
+        print("Deleted %s offers" % result.deleted_count)

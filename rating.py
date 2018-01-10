@@ -337,16 +337,16 @@ class GetmyadRating(object):
     def delete_old_rating_stats(self):
         u"""Удаляем старую статистику"""
         offersId = []
-        campaignIdList = [x['guid'] for x in self.db.campaign.find({"showConditions.retargeting": False})]
-        informerIdList = [x['guid'] for x in self.db.informer.find({})]
+        campaignIdList = [x['guid'] for x in self.db.campaign.find({"showConditions.retargeting": False}, {'guid': 1})]
+        informerIdList = [x['guid'] for x in self.db.informer.find({}), {'guid': 1}]
         print(informerIdList)
         queri = {"campaignId": {"$in": campaignIdList}}
         for item in self.db.offer.find(queri, {"guid": 1, "_id": 0}):
             offersId.append(item['guid'])
 
-        a = self.db.stats_daily.rating.remove({'adv': {'$nin': informerIdList}})
-        i = self.db.stats_daily.rating.remove({'guid': {'$nin': offersId}})
-        d = self.db.stats_daily.rating.remove({'full_rating': 0})
+        a = self.db.stats_daily.rating.delete_many({'adv': {'$nin': informerIdList}})
+        d = self.db.stats_daily.rating.delete_many({'full_rating': 0})
+        i = self.db.stats_daily.rating.delete_many({'guid': {'$nin': offersId}})
         # Сбрасуем показы и клики в товарах
         y = self.db.offer.update({'$or': [{'impressions': {'$lte': 0}}, {'impressions': {'$gte': 1500}},
                                           {'impressions': {'$exists': False}}]},
