@@ -338,7 +338,7 @@ class GetmyadRating(object):
         u"""Удаляем старую статистику"""
         offersId = []
         campaignIdList = [x['guid'] for x in self.db.campaign.find({"showConditions.retargeting": False}, {'guid': 1})]
-        informerIdList = [x['guid'] for x in self.db.informer.find({}), {'guid': 1}]
+        informerIdList = [x['guid'] for x in self.db.informer.find({}, {'guid': 1})]
         print(informerIdList)
         queri = {"campaignId": {"$in": campaignIdList}}
         for item in self.db.offer.find(queri, {"guid": 1, "_id": 0}):
@@ -356,9 +356,9 @@ class GetmyadRating(object):
                                                        {'impressions': {'$exists': False}}]},
                                               {'$set': {'impressions': 0, 'clicks': 0}}, multi=True, w=1)
 
-        print("records deleted %s" % i)
-        print("records offer/inf 0 rating deleted %s" % d)
-        print("records inf rating deleted %s" % a)
+        print("records deleted %s" % i.deleted_count)
+        print("records offer/inf 0 rating deleted %s" % d.deleted_count)
+        print("records inf rating deleted %s" % a.deleted_count)
         print("clearn offer imp/click %s" % y)
         print("clearn offer/inf imp/click %s" % z)
 

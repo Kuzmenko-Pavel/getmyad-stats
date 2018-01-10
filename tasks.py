@@ -145,8 +145,8 @@ def delete_old_rating_stats():
     db = _mongo_main_db()
     pool = _mongo_worker_db_pool()
     rating = GetmyadRating(db, pool)
-    rating.trunkete_rating_stats()
     rating.delete_old_rating_stats()
+    rating.trunkete_rating_stats()
     print('Delete old rating data is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
