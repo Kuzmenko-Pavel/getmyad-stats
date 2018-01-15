@@ -11,7 +11,7 @@ class GetmyadCheck():
     def __init__(self, db, rpc):
         self.db = db
         self.rpc = rpc
-        self.watch_last_n_minutes = 15
+        self.watch_last_n_minutes = 10
 
     def check_outdated_campaigns(self):
         """ Иногда AdLoad не оповещает GetMyAd об остановке кампании, об отработке
@@ -32,10 +32,13 @@ class GetmyadCheck():
                 campaigns.append(guid)
         campaigns = set(campaigns)
         campaigns = list(campaigns)
-        for ca in self.db.campaign.find({"status": "working", "guid": {'$in': campaigns}}, {'guid': 1}):
+        for ca in self.db.campaign.find({"status": "working", "guid": {'$in': campaigns}},
+                                        {'guid': 1, 'showConditions.retargeting': 1}):
             guid = ca['guid']
-            result = self.rpc.campaign_update(guid)
-            print u"Обнавляю компанию %s %s" % (guid, result)
+            retargeting = ca.get('showConditions', {}).get('retargeting', False)
+            if not retargeting:
+                result = self.rpc.campaign_update(guid)
+                print u"Обнавляю компанию %s %s" % (guid, result)
 
     def check_campaigns(self):
         ad = AdloadData(mssql_connection_adload())
