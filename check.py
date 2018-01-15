@@ -1,4 +1,4 @@
-# -*- coding: UTF-8 -*-
+# -*- coding: utf-8 -*-
 import datetime
 
 import pymongo
@@ -11,7 +11,7 @@ class GetmyadCheck():
     def __init__(self, db, rpc):
         self.db = db
         self.rpc = rpc
-        self.watch_last_n_minutes = 60
+        self.watch_last_n_minutes = 15
 
     def check_outdated_campaigns(self):
         """ Иногда AdLoad не оповещает GetMyAd об остановке кампании, об отработке
@@ -32,29 +32,29 @@ class GetmyadCheck():
                 campaigns.append(guid)
         campaigns = set(campaigns)
         campaigns = list(campaigns)
-        for ca in self.db.campaign.find({"status": "working", "guid": {'$in': campaigns}}):
-            result = self.rpc.campaign_update(ca['guid'])
-            print("Обнавляю компанию %s %s" % (ca['guid'], result))
+        for ca in self.db.campaign.find({"status": "working", "guid": {'$in': campaigns}}, {'guid': 1}):
+            guid = ca['guid']
+            result = self.rpc.campaign_update(guid)
+            print u"Обнавляю компанию %s %s" % (guid, result)
 
     def check_campaigns(self):
         ad = AdloadData(mssql_connection_adload())
-        c = self.db['campaign'].find().sort('$natural', pymongo.DESCENDING)
-
+        c = self.db['campaign'].find({'status': 'working'}, {'guid': 1, 'title': 1})
         for item in c:
             status = ad.campaign_details(item['guid'])
             if not status:
                 result_stop = self.rpc.campaign_stop(item['guid'])
-                print("Кампания не запущена в AdLoad или запрещена для показа в GetMyAd. \n"
-                      "Останавливаю кампанию: %s %s %s" % (item['guid'], item['title'], result_stop))
+                print(u"Кампания не запущена в AdLoad или запрещена для показа в GetMyAd. \n"
+                      u"Останавливаю кампанию: %s %s %s" % (item['guid'], item['title'], result_stop))
                 continue
 
             status = ad.campaign_check(item['guid'])
             if not status:
                 result_stop = self.rpc.campaign_hold(item['guid'])
-                print("В кампании нет активных предложений. \n "
-                      "Возможные причины: на счету кампании нет денег,"
-                      "не отработал парсер Рынка (для интернет-магазинов).\n "
-                      "Замораживаю кампанию: %s %s %s" % (item['guid'], item['title'], result_stop))
+                print(u"В кампании нет активных предложений. \n "
+                      u"Возможные причины: на счету кампании нет денег,"
+                      u"не отработал парсер Рынка (для интернет-магазинов).\n "
+                      u"Замораживаю кампанию: %s %s %s" % (item['guid'], item['title'], result_stop))
 
     def check_cdn(self):
         date = datetime.datetime.now() - datetime.timedelta(minutes=15)
