@@ -116,6 +116,18 @@ def create_offer_rating():
 
 
 @periodic_task(run_every=crontab(minute="0", hour="0"))
+def stop_old_campaign():
+    u"""Останавливаем компании из холда"""
+    print('Stop old campaign is start')
+    elapsed_start_time = datetime.datetime.now()
+    db = _mongo_main_db()
+    clean = GetmyadClean(db)
+    rpc = xmlrpclib.ServerProxy(GETMYAD_XMLRPC_HOST)
+    clean.stop_old_campaign(rpc)
+    print('Stop old campaign is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
+
+
+@periodic_task(run_every=crontab(minute="0", hour="0"))
 def delete_old_stats():
     u"""Удаляем старую статистику"""
     print('Delete old data is start')

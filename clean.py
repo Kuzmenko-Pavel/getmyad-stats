@@ -20,6 +20,17 @@ class GetmyadClean():
              'approved': {'$ne': True},
              'date': {'$lte': clean_to_date}})
 
+    def stop_old_campaign(self, rpc):
+        """Удаляем старую статистику"""
+        date = datetime.datetime.now()
+        c = self.db['campaign'].find({'status': 'hold'}, {'guid': 1, 'title': 1, 'day_of_holden': 1})
+        for item in c:
+            day_of_holden = item.get('day_of_holden')
+            if isinstance(day_of_holden, datetime.datetime):
+                if (date - day_of_holden).days > 7:
+                    result_stop = rpc.campaign_stop(item['guid'])
+                    print(u"Останавливаю кампанию: %s %s %s" % (item['guid'], item['title'], result_stop))
+
     def delete_old_stats(self):
         """Удаляем старую статистику"""
         delete_to_date = datetime.datetime.now() - datetime.timedelta(days=3)
