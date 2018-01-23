@@ -70,7 +70,6 @@ class GetmyadCheck():
             guid = item['guid']
             link.append('/block/%s.json' % guid)
             link.append('/block/%s.js' % guid)
-            link.append('/getmyad/%s.js' % guid)
 
         for item in link:
             for cdn in cdns:
