@@ -13,7 +13,7 @@ requires = [
     "amqplib==1.0.2",
     "celery==3.1.7",
     "pymongo==3.2.2",
-    "pymssql==2.0.1",
+    "pymssql==2.1.3",
     "xlwt==0.7.5",
     "python-memcached==1.57",
     'requests',

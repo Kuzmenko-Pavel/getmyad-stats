@@ -46,17 +46,17 @@ class GetmyadCheck():
         for item in c:
             status = ad.campaign_details(item['guid'])
             if not status:
-                result_stop = self.rpc.campaign_stop(item['guid'])
-                print(u"Кампания не запущена в AdLoad или запрещена для показа в GetMyAd. \n"
+                # result_stop = self.rpc.campaign_stop(item['guid'])
+                result_stop = ''
+                print(u"Кампания не найдена в AdLoad\n"
                       u"Останавливаю кампанию: %s %s %s" % (item['guid'], item['title'], result_stop))
                 continue
 
             status = ad.campaign_check(item['guid'])
             if not status:
-                result_stop = self.rpc.campaign_hold(item['guid'])
+                # result_stop = self.rpc.campaign_hold(item['guid'])
+                result_stop = ''
                 print(u"В кампании нет активных предложений. \n "
-                      u"Возможные причины: на счету кампании нет денег,"
-                      u"не отработал парсер Рынка (для интернет-магазинов).\n "
                       u"Замораживаю кампанию: %s %s %s" % (item['guid'], item['title'], result_stop))
 
     def check_cdn(self):

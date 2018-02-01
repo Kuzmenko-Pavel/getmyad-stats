@@ -34,30 +34,24 @@ class AdloadData(object):
                 'getmyad': (bool)
             (struct-end)
         '''
-        cursor = self.connection_adload.cursor()
-        cursor.execute('''select a.AdvertiseId as AdvertiseID, a.UserID as UserID, Title, m.Name as Manager 
-                        from Advertise a
-                        left outer join Users u on u.UserID = a.UserID
-                        left outer join Manager m  on u.ManagerID = m.id
-                        where a.AdvertiseID = %s''', campaign)
-        row = cursor.fetchone()
-        if not row:
-            cursor.close()
-            return False
-        cursor.close()
-        return True
+        with self.connection_adload.cursor(as_dict=True) as cursor:
+            cursor.execute('''SELECT 1 AS status
+                            FROM Advertise AS a
+                            LEFT OUTER JOIN Users AS u ON u.UserID = a.UserID
+                            LEFT OUTER JOIN Manager AS m  ON u.ManagerID = m.id
+                            WHERE a.AdvertiseID = %s''', campaign)
+            if cursor.fetchone() is None:
+                return False
+            return True
 
     def campaign_check(self, campaign):
         ''' Возвращает подробную информацию о кампании ``campaign``.
         Формат ответа::
         '''
-        cursor = self.connection_adload.cursor()
-        cursor.execute('''select isActive
-                        from Advertise
-                        where isActive = 1 and AdvertiseID = %s''', campaign)
-        row = cursor.fetchone()
-        if not row:
-            cursor.close()
+        with self.connection_adload.cursor(as_dict=True) as cursor:
+            cursor.execute('''SELECT top 1 1 AS status FROM Lot AS l
+                              INNER JOIN LotByAdvertise AS la ON l.LotID = la.LotID
+                              WHERE la.AdvertiseID = %s AND l.isAdvertising = 0''', campaign)
+            if cursor.fetchone() is None:
+                return True
             return False
-        cursor.close()
-        return True
