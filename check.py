@@ -46,16 +46,14 @@ class GetmyadCheck():
         for item in c:
             status = ad.campaign_details(item['guid'])
             if not status:
-                # result_stop = self.rpc.campaign_stop(item['guid'])
-                result_stop = ''
+                result_stop = self.rpc.campaign_stop(item['guid'])
                 print(u"Кампания не найдена в AdLoad\n"
                       u"Останавливаю кампанию: %s %s %s" % (item['guid'], item['title'], result_stop))
                 continue
 
             status = ad.campaign_check(item['guid'])
             if not status:
-                # result_stop = self.rpc.campaign_hold(item['guid'])
-                result_stop = ''
+                result_stop = self.rpc.campaign_hold(item['guid'])
                 print(u"В кампании нет активных предложений. \n "
                       u"Замораживаю кампанию: %s %s %s" % (item['guid'], item['title'], result_stop))
 

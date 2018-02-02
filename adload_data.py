@@ -51,7 +51,7 @@ class AdloadData(object):
         with self.connection_adload.cursor(as_dict=True) as cursor:
             cursor.execute('''SELECT top 1 1 AS status FROM Lot AS l
                               INNER JOIN LotByAdvertise AS la ON l.LotID = la.LotID
-                              WHERE la.AdvertiseID = %s AND l.isAdvertising = 0''', campaign)
+                              WHERE la.AdvertiseID = %s AND l.isAdvertising = 1''', campaign)
             if cursor.fetchone() is None:
-                return True
-            return False
+                return False
+            return True
