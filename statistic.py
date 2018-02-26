@@ -68,7 +68,16 @@ class GetmyadStats(object):
                             ip = x.get('ip')
                             if ip:
                                 key = (dt, ip)
-                                ip_buffer[key] = (impressions_block, impressions_block_not_valid)
+                                impressions_block = ip_buffer.get(key, (0, 0, 0))[0]
+                                impressions_block_valid = ip_buffer.get(key, (0, 0, 0))[1]
+                                impressions_block_not_valid = ip_buffer.get(key, (0, 0, 0))[2]
+                                impressions_block += 1
+                                if garanted:
+                                    impressions_block_valid += 1
+                                else:
+                                    impressions_block_not_valid += 1
+                                ip_buffer[key] = (
+                                impressions_block, impressions_block_valid, impressions_block_not_valid)
                         except Exception as e:
                             print("Iteration error", e)
                             pass
@@ -104,7 +113,8 @@ class GetmyadStats(object):
                 },
                     {'$inc': {
                         'impressions_block': value[0],
-                        'impressions_block_not_valid': value[1],
+                        'impressions_block_valid': value[1],
+                        'impressions_block_not_valid': value[2],
                     }},
                     upsert=True, multi=False)
             except Exception as ex:
@@ -132,6 +142,7 @@ class GetmyadStats(object):
 
         buffer = {}
         worker_stats = {}
+        ip_buffer = {}
         processed_records = 0
         processed_social_records = 0
         processed_paymend_records = 0
@@ -168,9 +179,10 @@ class GetmyadStats(object):
                             dt = datetime.datetime(n.year, n.month, n.day)
 
                             key = (x['inf'].lower(), dt)
-                            stats_key = (x.get('branch', 'NOT'), dt, x.get('conformity', 'NOT'))
+                            branch = x.get('branch', 'NOT')
+                            stats_key = (branch, dt, x.get('conformity', 'NOT'))
 
-                            stats_key_all = (x.get('branch', 'NOT'), dt, 'ALL')
+                            stats_key_all = (branch, dt, 'ALL')
 
                             if not x.get('test', False):
                                 impressions = buffer.get(key, (0, 0))[0]
@@ -186,6 +198,26 @@ class GetmyadStats(object):
                                 buffer[key] = (impressions, social_impressions)
                             worker_stats[stats_key] = worker_stats.get(stats_key, 0) + 1
                             worker_stats[stats_key_all] = worker_stats.get(stats_key_all, 0) + 1
+                            ip = x.get('ip')
+                            if ip:
+                                key = (dt, ip)
+                                impressions = ip_buffer.get(key, (0, 0, 0, 0, 0))[0]
+                                place_impressions = ip_buffer.get(key, (0, 0, 0, 0, 0))[1]
+                                social_impressions = ip_buffer.get(key, (0, 0, 0, 0, 0))[2]
+                                retargeting_impressions = ip_buffer.get(key, (0, 0, 0, 0, 0))[3]
+                                recommended_impressions = ip_buffer.get(key, (0, 0, 0, 0, 0))[4]
+                                impressions += 1
+                                if x.get('social', False):
+                                    social_impressions += 1
+                                else:
+                                    if branch == 'NL31':
+                                        retargeting_impressions += 1
+                                    elif branch == 'NL32':
+                                        recommended_impressions += 1
+                                    else:
+                                        place_impressions += 1
+                                ip_buffer[key] = (impressions, place_impressions, social_impressions,
+                                                  retargeting_impressions, recommended_impressions)
                         except Exception as e:
                             print("Iteration error", e)
                             pass
@@ -211,6 +243,22 @@ class GetmyadStats(object):
                                                upsert=False, multi=False)
             except Exception as ex:
                 print(ex, "buffer", key, value)
+
+        for key, value in ip_buffer.iteritems():
+            try:
+                self.db.ip.stats.daily.raw.update({'ip': key[1],
+                                                   'date': key[0]},
+                                                  {'$inc':
+                                                      {
+                                                          'impressions': value[0],
+                                                          'place_impressions': value[1],
+                                                          'social_impressions': value[2],
+                                                          'retargeting_impressions': value[3],
+                                                          'recommended_impressions': value[4]
+                                                      }},
+                                                  upsert=True, multi=False)
+            except Exception as ex:
+                print(ex, "ip_buffer", key, value)
 
         for key, value in worker_stats.iteritems():
             try:
