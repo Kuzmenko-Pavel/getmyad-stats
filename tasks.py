@@ -17,6 +17,7 @@ MONGO_HOST = 'srv-5.yottos.com:27018,srv-5.yottos.com:27019,srv-5.yottos.com:270
 MONGO_DATABASE = 'getmyad_db'
 MONGO_WORKER_HOST_POOL = ['srv-2.yottos.com:27017', ]
 
+
 def _mongo_connection(host):
     u"""Возвращает Connection к серверу MongoDB"""
     try:
