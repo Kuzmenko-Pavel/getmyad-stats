@@ -267,7 +267,6 @@ class GetmyadStats(object):
 
         for x in buffer_click:
             processed_records += 1
-
             if x.get('social', False):
                 self.db.stats.daily.raw.update({'guid': x['inf'],
                                                 'date': datetime.datetime.fromordinal(x['dt'].toordinal())},
@@ -293,6 +292,26 @@ class GetmyadStats(object):
             self.db.worker_stats.update({'date': datetime.datetime.fromordinal(x['dt'].toordinal())},
                                         {'$inc': {skey: 1,
                                                   (str(x.get('branch', 'L0')) + '.CALL'): 1}}, upsert=False)
+            ip_data = {}
+            if x.get('social', False):
+                ip_data['social_clicks'] = 1
+            else:
+                branch = x.get('branch', 'L0')
+                if branch == 'NL31':
+                    ip_data['retargeting_clicks'] = 1
+                elif branch == 'NL32':
+                    ip_data['recommended_clicks'] = 1
+                else:
+                    ip_data['place_clicks'] = 1
+            ip_data['all_clicks'] = 1
+            ip_data['unique_clicks'] = 1 if x['unique'] else 0
+
+            self.db.ip.stats.daily.raw.update({
+                'ip': x['ip'],
+                'date': datetime.datetime.fromordinal(x['dt'].toordinal())
+            }, {
+                '$inc': ip_data
+            })
 
         print("Finished %s records in %s seconds" %
               (processed_records, (datetime.datetime.now() - elapsed_start_time).seconds))
