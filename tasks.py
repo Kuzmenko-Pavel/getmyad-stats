@@ -211,6 +211,7 @@ def stats_daily_adv_update():
     # За сегодня
     elapsed_start_time = datetime.datetime.now()
     print('Import worker data to stats_daily is start')
+    stats.import_retargeting_track_data()
     stats.importWorkerBlockData()
     stats.importWorkerOfferData()
     print('Import worker data elapsed %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)

@@ -15,6 +15,82 @@ class GetmyadStats(object):
         self.db = db
         self.pool = pool
 
+    def import_retargeting_track_data(self):
+        u"""Mongo worker retargeting track data import"""
+        elapsed_start_time = datetime.datetime.now()
+
+        ip_buffer = {}
+        processed_records = 0
+
+        for db2 in self.pool:
+            try:
+                print(db2)
+
+                try:
+                    last_processed_id = db2.config.find_one({'key': 'impressions retargeting last _id'})['value']
+                except:
+                    last_processed_id = None
+                if not isinstance(last_processed_id, bson.objectid.ObjectId):
+                    last_processed_id = None
+
+                try:
+                    cursor = db2['log.retargeting'].find().sort("$natural", pymongo.DESCENDING)
+                except Exception as e:
+                    print("Cursor ERROR", e)
+                    continue
+                try:
+                    end_id = cursor[0]['_id']  # Последний id, который будет обработан в этот раз
+                    print(end_id)
+                except Exception as e:
+                    print("importImpressionsFromMongo: nothing to do")
+                    continue
+
+                try:
+                    for x in cursor:
+                        try:
+                            if last_processed_id is not None and x['_id'] == last_processed_id:
+                                break
+                            processed_records += 1
+                            n = x['dt']
+                            dt = datetime.datetime(n.year, n.month, n.day)
+                            ip = x.get('ip')
+                            if ip:
+                                key = (dt, ip)
+                                impressions_retargeting = ip_buffer.get(key, 0)
+                                impressions_retargeting += 1
+                                ip_buffer[key] = impressions_retargeting
+                        except Exception as e:
+                            print("Iteration error", e)
+                            pass
+                except Exception as e:
+                    print("For cursor error", e)
+                    pass
+                print("read base complite")
+                db2.config.update({'key': 'impressions retargeting last _id'}, {'$set': {'value': end_id}}, True)
+            except Exception as e:
+                print("Worker base error", e)
+                pass
+
+        self.db.reset_error_history()
+
+        for key, value in ip_buffer.iteritems():
+            try:
+                self.db.ip.stats.daily.raw.update({
+                    'ip': key[1],
+                    'date': key[0]
+                },
+                    {'$inc': {
+                        'impressions_retargeting': value
+                    }},
+                    upsert=True, multi=False)
+            except Exception as ex:
+                print(ex, "ip_buffer", key, value)
+
+        elapsed = (datetime.datetime.now() - elapsed_start_time).seconds
+        print('%s seconds, %s records processed. \n' % (elapsed, processed_records))
+        if self.db.previous_error():
+            print("Database error", self.db.previous_error())
+
     def importWorkerBlockData(self):
         u"""Mongo worker data import"""
         elapsed_start_time = datetime.datetime.now()
