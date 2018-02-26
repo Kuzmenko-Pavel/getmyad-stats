@@ -20,6 +20,7 @@ class GetmyadStats(object):
         elapsed_start_time = datetime.datetime.now()
 
         buffer = {}
+        ip_buffer = {}
         processed_records = 0
 
         for db2 in self.pool:
@@ -34,8 +35,7 @@ class GetmyadStats(object):
                     last_processed_id = None
 
                 try:
-                    cursor = db2['log.impressions.block'].find({}, {'guid': True, 'dt': True, 'garanted': True,
-                                                                    '_id': True}).sort("$natural", pymongo.DESCENDING)
+                    cursor = db2['log.impressions.block'].find().sort("$natural", pymongo.DESCENDING)
                 except Exception as e:
                     print("Cursor ERROR", e)
                     continue
@@ -57,13 +57,18 @@ class GetmyadStats(object):
                             key = (dt, guid)
                             impressions_block = buffer.get(key, (0, 0))[0]
                             impressions_block_not_valid = buffer.get(key, (0, 0))[1]
+                            garanted = x.get('garanted', False)
                             processed_records += 1
-                            if x.get('garanted', False):
+                            if garanted:
                                 impressions_block += 1
                             else:
                                 impressions_block_not_valid += 1
 
                             buffer[key] = (impressions_block, impressions_block_not_valid)
+                            ip = x.get('ip')
+                            if ip:
+                                key = (dt, ip)
+                                ip_buffer[key] = (impressions_block, impressions_block_not_valid)
                         except Exception as e:
                             print("Iteration error", e)
                             pass
@@ -90,6 +95,20 @@ class GetmyadStats(object):
                     upsert=True, multi=False)
             except Exception as ex:
                 print(ex, "buffer", key, value)
+
+        for key, value in ip_buffer.iteritems():
+            try:
+                self.db.ip.stats.daily.raw.update({
+                    'ip': key[1],
+                    'date': key[0]
+                },
+                    {'$inc': {
+                        'impressions_block': value[0],
+                        'impressions_block_not_valid': value[1],
+                    }},
+                    upsert=True, multi=False)
+            except Exception as ex:
+                print(ex, "ip_buffer", key, value)
 
         elapsed = (datetime.datetime.now() - elapsed_start_time).seconds
         print('%s seconds, %s records processed. \n' % (elapsed, processed_records))
