@@ -8,10 +8,10 @@ log = logging.getLogger(__name__)
 
 def mssql_connection_adload():
     pymssql.set_max_connections(450)
-    conn = pymssql.connect(host='srv-1.yottos.com',
+    conn = pymssql.connect(host='srv-3.yottos.com',
                            user='web',
                            password='odif8duuisdofj',
-                           database='1gb_YottosAdLoad',
+                           database='Adload',
                            as_dict=True,
                            charset='cp1251')
     conn.autocommit(True)
