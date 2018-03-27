@@ -5,7 +5,7 @@ from amqplib import client_0_8 as amqp
 class MQ():
     def _get_worker_channel(self):
         ''' Подключается к брокеру mq '''
-        conn = amqp.Connection(host='srv-4.yottos.com',
+        conn = amqp.Connection(host='amqp.yottos.com',
                                userid='worker',
                                password='worker',
                                virtual_host='worker',
