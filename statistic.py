@@ -6,6 +6,7 @@ import socket
 
 import bson.objectid
 import pymongo
+import requests
 import xlwt
 from pymongo.errors import BulkWriteError
 
@@ -1143,6 +1144,9 @@ class GetmyadStats(object):
 
     def createCatigoriesDomainReport(self, date):
         assert isinstance(date, (datetime.datetime, datetime.date))
+        headers = {'X-Cache-Update': '1'}
+        cdns = ['http://cdn.srv-10.yottos.com', 'http://cdn.srv-11.yottos.com',
+                'http://cdn.srv-12.yottos.com', 'https://cdn.yottos.com']
         date = datetime.datetime(date.year, date.month, date.day, 0, 0)
         print(date)
         activ_domain = [item['domain'] for item in
@@ -1224,7 +1228,10 @@ class GetmyadStats(object):
         buf.seek(0)
         ftp = ftplib.FTP(host='cdn.yottos.com')
         ftp.login('cdn', '$www-app$')
-        ftp.cwd('httpdocs')
         ftp.cwd('report')
         ftp.storbinary('STOR category_report.xls', buf)
         ftp.close()
+        for cdn in cdns:
+            url = '%s/report/category_report.xls' % cdn
+            r = requests.get(url, headers=headers, verify=False)
+            print('%s - %s' % (url, r.status_code))
