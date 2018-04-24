@@ -3,6 +3,7 @@ import StringIO
 import datetime
 import ftplib
 import socket
+from collections import defaultdict
 
 import bson.objectid
 import pymongo
@@ -20,7 +21,7 @@ class GetmyadStats(object):
         u"""Mongo worker retargeting track data import"""
         elapsed_start_time = datetime.datetime.now()
 
-        ip_buffer = {}
+        ip_buffer = defaultdict(int)
         processed_records = 0
 
         for db2 in self.pool:
@@ -57,9 +58,7 @@ class GetmyadStats(object):
                             ip = x.get('ip')
                             if ip:
                                 key = (dt, ip)
-                                impressions_retargeting = ip_buffer.get(key, 0)
-                                impressions_retargeting += 1
-                                ip_buffer[key] = impressions_retargeting
+                                ip_buffer[key] += 1
                         except Exception as e:
                             print("Iteration error", e)
                             pass
@@ -74,18 +73,22 @@ class GetmyadStats(object):
 
         self.db.reset_error_history()
 
+        operations = []
         for key, value in ip_buffer.iteritems():
             try:
-                self.db.ip.stats.daily.raw.update({
-                    'ip': key[1],
-                    'date': key[0]
-                },
-                    {'$inc': {
-                        'impressions_retargeting': value
-                    }},
-                    upsert=True, multi=False)
+                operations.append(
+                    pymongo.UpdateOne(
+                        {'ip': key[1], 'date': key[0]},
+                        {'$inc': {'impressions_retargeting': value}},
+                        upsert=True
+                    )
+                )
             except Exception as ex:
                 print(ex, "ip_buffer", key, value)
+        try:
+            self.db.ip.stats.daily.raw.bulk_write(operations, ordered=False)
+        except BulkWriteError as bwe:
+            print(bwe.details)
 
         elapsed = (datetime.datetime.now() - elapsed_start_time).seconds
         print('%s seconds, %s records processed. \n' % (elapsed, processed_records))
@@ -96,8 +99,8 @@ class GetmyadStats(object):
         u"""Mongo worker data import"""
         elapsed_start_time = datetime.datetime.now()
 
-        buffer = {}
-        ip_buffer = {}
+        buffer = defaultdict(lambda: [0, 0])
+        ip_buffer = defaultdict(lambda: [0, 0, 0])
         processed_records = 0
 
         for db2 in self.pool:
@@ -132,29 +135,22 @@ class GetmyadStats(object):
                             guid = x.get('guid', '')
                             dt = datetime.datetime(n.year, n.month, n.day)
                             key = (dt, guid)
-                            impressions_block = buffer.get(key, (0, 0))[0]
-                            impressions_block_not_valid = buffer.get(key, (0, 0))[1]
+
                             garanted = x.get('garanted', False)
                             processed_records += 1
                             if garanted:
-                                impressions_block += 1
+                                buffer[key][0] += 1
                             else:
-                                impressions_block_not_valid += 1
+                                buffer[key][1] += 1
 
-                            buffer[key] = (impressions_block, impressions_block_not_valid)
                             ip = x.get('ip')
                             if ip:
                                 key = (dt, ip)
-                                impressions_block = ip_buffer.get(key, (0, 0, 0))[0]
-                                impressions_block_valid = ip_buffer.get(key, (0, 0, 0))[1]
-                                impressions_block_not_valid = ip_buffer.get(key, (0, 0, 0))[2]
-                                impressions_block += 1
+                                ip_buffer[key][0] += 1
                                 if garanted:
-                                    impressions_block_valid += 1
+                                    ip_buffer[key][1] += 1
                                 else:
-                                    impressions_block_not_valid += 1
-                                ip_buffer[key] = (
-                                impressions_block, impressions_block_valid, impressions_block_not_valid)
+                                    ip_buffer[key][2] += 1
                         except Exception as e:
                             print("Iteration error", e)
                             pass
@@ -168,34 +164,45 @@ class GetmyadStats(object):
                 pass
 
         self.db.reset_error_history()
+        operations = []
+
         for key, value in buffer.iteritems():
             try:
-                self.db.stats.daily.raw.update({
-                    'guid': key[1],
-                    'date': key[0]
-                },
-                    {'$inc': {
-                        'impressions_block': value[0],
-                        'impressions_block_not_valid': value[1],
-                    }},
-                    upsert=True, multi=False)
+                operations.append(
+                    pymongo.UpdateOne(
+                        {'guid': key[1], 'date': key[0]},
+                        {'$inc': {'impressions_block': value[0], 'impressions_block_not_valid': value[1]}},
+                        upsert=True)
+                )
             except Exception as ex:
                 print(ex, "buffer", key, value)
 
+        try:
+            self.db.stats.daily.raw.bulk_write(operations, ordered=False)
+        except BulkWriteError as bwe:
+            print(bwe.details)
+
+        operations = []
+
         for key, value in ip_buffer.iteritems():
             try:
-                self.db.ip.stats.daily.raw.update({
-                    'ip': key[1],
-                    'date': key[0]
-                },
-                    {'$inc': {
-                        'impressions_block': value[0],
-                        'impressions_block_valid': value[1],
-                        'impressions_block_not_valid': value[2],
-                    }},
-                    upsert=True, multi=False)
+                operations.append(
+                    pymongo.UpdateOne(
+                        {'ip': key[1], 'date': key[0]},
+                        {'$inc': {
+                            'impressions_block': value[0],
+                            'impressions_block_valid': value[1],
+                            'impressions_block_not_valid': value[2],
+                        }},
+                        upsert=True)
+                )
             except Exception as ex:
                 print(ex, "ip_buffer", key, value)
+
+        try:
+            self.db.ip.stats.daily.raw.bulk_write(operations, ordered=False)
+        except BulkWriteError as bwe:
+            print(bwe.details)
 
         elapsed = (datetime.datetime.now() - elapsed_start_time).seconds
         print('%s seconds, %s records processed. \n' % (elapsed, processed_records))
@@ -217,9 +224,9 @@ class GetmyadStats(object):
         u"""Mongo worker data import"""
         elapsed_start_time = datetime.datetime.now()
 
-        buffer = {}
-        worker_stats = {}
-        ip_buffer = {}
+        buffer = defaultdict(lambda: [0, 0])
+        worker_stats = defaultdict(int)
+        ip_buffer = defaultdict(lambda: [0, 0, 0, 0, 0])
         processed_records = 0
         processed_social_records = 0
         processed_paymend_records = 0
@@ -256,45 +263,36 @@ class GetmyadStats(object):
                             dt = datetime.datetime(n.year, n.month, n.day)
 
                             key = (x['inf'].lower(), dt)
-                            branch = x.get('branch', 'NOT')
-                            stats_key = (branch, dt, x.get('conformity', 'NOT'))
-
-                            stats_key_all = (branch, dt, 'ALL')
 
                             if not x.get('test', False):
-                                impressions = buffer.get(key, (0, 0))[0]
-                                social_impressions = buffer.get(key, (0, 0))[1]
                                 if x.get('social', False):
                                     processed_social_records += 1
                                     processed_records += 1
-                                    social_impressions += 1
+                                    buffer[key][1] += 1
                                 else:
                                     processed_paymend_records += 1
                                     processed_records += 1
-                                    impressions += 1
-                                buffer[key] = (impressions, social_impressions)
-                            worker_stats[stats_key] = worker_stats.get(stats_key, 0) + 1
-                            worker_stats[stats_key_all] = worker_stats.get(stats_key_all, 0) + 1
+                                    buffer[key][0] += 1
+
                             ip = x.get('ip')
                             if ip:
                                 key = (dt, ip)
-                                impressions = ip_buffer.get(key, (0, 0, 0, 0, 0))[0]
-                                place_impressions = ip_buffer.get(key, (0, 0, 0, 0, 0))[1]
-                                social_impressions = ip_buffer.get(key, (0, 0, 0, 0, 0))[2]
-                                retargeting_impressions = ip_buffer.get(key, (0, 0, 0, 0, 0))[3]
-                                recommended_impressions = ip_buffer.get(key, (0, 0, 0, 0, 0))[4]
-                                impressions += 1
+                                ip_buffer[key][0] += 1
                                 if x.get('social', False):
-                                    social_impressions += 1
+                                    ip_buffer[key][2] += 1
                                 else:
                                     if branch == 'NL31':
-                                        retargeting_impressions += 1
+                                        ip_buffer[key][3] += 1
                                     elif branch == 'NL32':
-                                        recommended_impressions += 1
+                                        ip_buffer[key][4] += 1
                                     else:
-                                        place_impressions += 1
-                                ip_buffer[key] = (impressions, place_impressions, social_impressions,
-                                                  retargeting_impressions, recommended_impressions)
+                                        ip_buffer[key][1] += 1
+
+                            branch = x.get('branch', 'NOT')
+                            stats_key = (branch, dt, x.get('conformity', 'NOT'))
+                            stats_key_all = (branch, dt, 'ALL')
+                            worker_stats[stats_key] += 1
+                            worker_stats[stats_key_all] += 1
                         except Exception as e:
                             print("Iteration error", e)
                             pass
@@ -308,41 +306,65 @@ class GetmyadStats(object):
                 pass
 
         self.db.reset_error_history()
+
+        operations = []
+
         for key, value in buffer.iteritems():
             try:
-                self.db.stats.daily.raw.update({'guid': key[0],
-                                                'date': key[1]},
-                                               {'$inc':
-                                                   {
-                                                       'impressions': value[0],
-                                                       'social_impressions': value[1]
-                                                   }},
-                                               upsert=False, multi=False)
+                operations.append(
+                    pymongo.UpdateOne({'guid': key[0],
+                                       'date': key[1]},
+                                      {'$inc':
+                                          {
+                                              'impressions': value[0],
+                                              'social_impressions': value[1]
+                                          }},
+                                      upsert=False)
+                )
             except Exception as ex:
                 print(ex, "buffer", key, value)
 
+        try:
+            self.db.stats.daily.raw.bulk_write(operations, ordered=False)
+        except BulkWriteError as bwe:
+            print(bwe.details)
+
         for key, value in ip_buffer.iteritems():
             try:
-                self.db.ip.stats.daily.raw.update({'ip': key[1],
-                                                   'date': key[0]},
-                                                  {'$inc':
-                                                      {
-                                                          'impressions': value[0],
-                                                          'place_impressions': value[1],
-                                                          'social_impressions': value[2],
-                                                          'retargeting_impressions': value[3],
-                                                          'recommended_impressions': value[4]
-                                                      }},
-                                                  upsert=True, multi=False)
+                operations.append(
+                    pymongo.UpdateOne({'ip': key[1],
+                                       'date': key[0]},
+                                      {'$inc':
+                                          {
+                                              'impressions': value[0],
+                                              'place_impressions': value[1],
+                                              'social_impressions': value[2],
+                                              'retargeting_impressions': value[3],
+                                              'recommended_impressions': value[4]
+                                          }},
+                                      upsert=True)
+                )
             except Exception as ex:
                 print(ex, "ip_buffer", key, value)
 
+        try:
+            self.db.ip.stats.daily.raw.bulk_write(operations, ordered=False)
+        except BulkWriteError as bwe:
+            print(bwe.details)
+
         for key, value in worker_stats.iteritems():
             try:
-                self.db.worker_stats.update({'date': key[1]},
-                                            {'$inc': {(str(key[0]) + '.' + str(key[2])): value}}, True)
+                operations.append(
+                    pymongo.UpdateOne({'date': key[1]},
+                                      {'$inc': {(str(key[0]) + '.' + str(key[2])): value}}, upsert=True)
+                )
             except Exception as ex:
                 print(ex, "worker_stats", key, value)
+
+        try:
+            self.db.worker_stats.bulk_write(operations, ordered=False)
+        except BulkWriteError as bwe:
+            print(bwe.details)
 
         elapsed = (datetime.datetime.now() - elapsed_start_time).seconds
         print('%s seconds, %s records processed. From this tiser %s social records, tiser %s paymend record' %
@@ -830,22 +852,68 @@ class GetmyadStats(object):
             ``date`` --- дата, на которую считать данные. Может быть типа datetime или date"""
         assert isinstance(date, (datetime.datetime, datetime.date))
         date = datetime.datetime(date.year, date.month, date.day, 0, 0)
+
+        data = defaultdict(lambda: defaultdict(int))
+
         condition1 = {'date': {'$gte': date, '$lt': date + datetime.timedelta(days=1)}}
         condition2 = {'date': {'$gte': date - datetime.timedelta(days=1), '$lt': date}}
         condition3 = {'date': {'$gte': date - datetime.timedelta(days=2), '$lt': date - datetime.timedelta(days=1)}}
         condition7 = {'date': {'$gte': date - datetime.timedelta(days=7), '$lt': date + datetime.timedelta(days=1)}}
         condition30 = {'date': {'$gte': date - datetime.timedelta(days=30), '$lt': date + datetime.timedelta(days=1)}}
         condition365 = {'date': {'$gte': date - datetime.timedelta(days=365), '$lt': date + datetime.timedelta(days=1)}}
-        userStats = self.db.users.group(key={'login': True}, condition={'manager': False},
-                                        reduce='function(obj,prev){}',
-                                        initial={})
-        userStats = map(lambda x: x['login'], userStats)
-        userStats1 = userStats
-        userStats2 = userStats
-        userStats3 = userStats
-        userStats7 = userStats
-        userStats30 = userStats
-        userStats365 = userStats
+
+        for x in self.db.users.find({}, {'login': 1, 'registrationDate': 1, '_id': 0}):
+            data[x['login']].update({'registrationDate': x.get('registrationDate'),
+                                     'totalCost': 0,
+                                     'impressions_block': 0,
+                                     'impressions': 0,
+                                     'clicks': 0,
+                                     'clicksUnique': 0,
+                                     'social_impressions': 0,
+                                     'social_clicks': 0,
+                                     'social_clicksUnique': 0,
+                                     'totalCost_2': 0,
+                                     'impressions_block_2': 0,
+                                     'impressions_2': 0,
+                                     'clicks_2': 0,
+                                     'clicksUnique_2': 0,
+                                     'social_impressions_2': 0,
+                                     'social_clicks_2': 0,
+                                     'social_clicksUnique_2': 0,
+                                     'totalCost_3': 0,
+                                     'impressions_block_3': 0,
+                                     'impressions_3': 0,
+                                     'clicks_3': 0,
+                                     'clicksUnique_3': 0,
+                                     'social_impressions_3': 0,
+                                     'social_clicks_3': 0,
+                                     'social_clicksUnique_3': 0,
+                                     'totalCost_7': 0,
+                                     'impressions_block_7': 0,
+                                     'impressions_7': 0,
+                                     'clicks_7': 0,
+                                     'clicksUnique_7': 0,
+                                     'social_impressions_7': 0,
+                                     'social_clicks_7': 0,
+                                     'social_clicksUnique_7': 0,
+                                     'totalCost_30': 0,
+                                     'impressions_block_30': 0,
+                                     'impressions_30': 0,
+                                     'clicks_30': 0,
+                                     'clicksUnique_30': 0,
+                                     'social_impressions_30': 0,
+                                     'social_clicks_30': 0,
+                                     'social_clicksUnique_30': 0,
+                                     'totalCost_365': 0,
+                                     'impressions_block_365': 0,
+                                     'impressions_365': 0,
+                                     'clicks_365': 0,
+                                     'clicksUnique_365': 0,
+                                     'social_impressions_365': 0,
+                                     'social_clicks_365': 0,
+                                     'social_clicksUnique_365': 0
+                                     })
+
         reduce = '''
                 function(o, p) {
                    p.totalCost += o.totalCost || 0;
@@ -902,166 +970,72 @@ class GetmyadStats(object):
             reduce=reduce,
             initial=initial
         )
+
         for x in cur1:
-            self.db.stats.user.summary.update({'user': x['user']},
-                                              {'$set': {'totalCost': x['totalCost'],
-                                                        'impressions_block': x['impressions_block'],
-                                                        'impressions': x['impressions'],
-                                                        'clicks': x['clicks'],
-                                                        'clicksUnique': x['clicksUnique'],
-                                                        'social_impressions': x['social_impressions'],
-                                                        'social_clicks': x['social_clicks'],
-                                                        'social_clicksUnique': x['social_clicksUnique'],
-                                                        }},
-                                              upsert=True)
-            if x['user'] in userStats1:
-                userStats1.remove(x['user'])
-        for x in userStats1:
-            self.db.stats.user.summary.update({'user': x},
-                                              {'$set': {'totalCost': 0,
-                                                        'impressions_block': 0,
-                                                        'impressions': 0,
-                                                        'clicks': 0,
-                                                        'clicksUnique': 0,
-                                                        'social_impressions': 0,
-                                                        'social_clicks': 0,
-                                                        'social_clicksUnique': 0
-                                                        }},
-                                              upsert=True)
+            data[x['user']].update({'totalCost': x['totalCost'],
+                                    'impressions_block': x['impressions_block'],
+                                    'impressions': x['impressions'],
+                                    'clicks': x['clicks'],
+                                    'clicksUnique': x['clicksUnique'],
+                                    'social_impressions': x['social_impressions'],
+                                    'social_clicks': x['social_clicks'],
+                                    'social_clicksUnique': x['social_clicksUnique'],
+                                    })
+
         for x in cur2:
-            self.db.stats.user.summary.update({'user': x['user']},
-                                              {'$set': {'totalCost_2': x['totalCost'],
-                                                        'impressions_block_2': x['impressions_block'],
-                                                        'impressions_2': x['impressions'],
-                                                        'clicks_2': x['clicks'],
-                                                        'clicksUnique_2': x['clicksUnique'],
-                                                        'social_impressions_2': x['social_impressions'],
-                                                        'social_clicks_2': x['social_clicks'],
-                                                        'social_clicksUnique_2': x['social_clicksUnique']
-                                                        }},
-                                              upsert=True)
-            if x['user'] in userStats2:
-                userStats2.remove(x['user'])
-        for x in userStats2:
-            self.db.stats.user.summary.update({'user': x},
-                                              {'$set': {'totalCost_2': 0,
-                                                        'impressions_block_2': 0,
-                                                        'impressions_2': 0,
-                                                        'clicks_2': 0,
-                                                        'clicksUnique_2': 0,
-                                                        'social_impressions_2': 0,
-                                                        'social_clicks_2': 0,
-                                                        'social_clicksUnique_2': 0
-                                                        }},
-                                              upsert=True)
+            data[x['user']].update({'totalCost_2': x['totalCost'],
+                                    'impressions_block_2': x['impressions_block'],
+                                    'impressions_2': x['impressions'],
+                                    'clicks_2': x['clicks'],
+                                    'clicksUnique_2': x['clicksUnique'],
+                                    'social_impressions_2': x['social_impressions'],
+                                    'social_clicks_2': x['social_clicks'],
+                                    'social_clicksUnique_2': x['social_clicksUnique']
+                                    })
 
         for x in cur3:
-            self.db.stats.user.summary.update({'user': x['user']},
-                                              {'$set': {'totalCost_3': x['totalCost'],
-                                                        'impressions_block_3': x['impressions_block'],
-                                                        'impressions_3': x['impressions'],
-                                                        'clicks_3': x['clicks'],
-                                                        'clicksUnique_3': x['clicksUnique'],
-                                                        'social_impressions_3': x['social_impressions'],
-                                                        'social_clicks_3': x['social_clicks'],
-                                                        'social_clicksUnique_3': x['social_clicksUnique']
-                                                        }},
-                                              upsert=True)
-            if x['user'] in userStats3:
-                userStats3.remove(x['user'])
-        for x in userStats3:
-            self.db.stats.user.summary.update({'user': x},
-                                              {'$set': {'totalCost_3': 0,
-                                                        'impressions_block_3': 0,
-                                                        'impressions_3': 0,
-                                                        'clicks_3': 0,
-                                                        'clicksUnique_3': 0,
-                                                        'social_impressions_3': 0,
-                                                        'social_clicks_3': 0,
-                                                        'social_clicksUnique_3': 0
-                                                        }},
-                                              upsert=True)
+            data[x['user']].update({'totalCost_3': x['totalCost'],
+                                    'impressions_block_3': x['impressions_block'],
+                                    'impressions_3': x['impressions'],
+                                    'clicks_3': x['clicks'],
+                                    'clicksUnique_3': x['clicksUnique'],
+                                    'social_impressions_3': x['social_impressions'],
+                                    'social_clicks_3': x['social_clicks'],
+                                    'social_clicksUnique_3': x['social_clicksUnique']
+                                    })
 
         for x in cur7:
-            self.db.stats.user.summary.update({'user': x['user']},
-                                              {'$set': {'totalCost_7': x['totalCost'],
-                                                        'impressions_block_7': x['impressions_block'],
-                                                        'impressions_7': x['impressions'],
-                                                        'clicks_7': x['clicks'],
-                                                        'clicksUnique_7': x['clicksUnique'],
-                                                        'social_impressions_7': x['social_impressions'],
-                                                        'social_clicks_7': x['social_clicks'],
-                                                        'social_clicksUnique_7': x['social_clicksUnique']
-                                                        }},
-                                              upsert=True)
-            if x['user'] in userStats7:
-                userStats7.remove(x['user'])
-        for x in userStats7:
-            self.db.stats.user.summary.update({'user': x},
-                                              {'$set': {'totalCost_7': 0,
-                                                        'impressions_block_7': 0,
-                                                        'impressions_7': 0,
-                                                        'clicks_7': 0,
-                                                        'clicksUnique_7': 0,
-                                                        'social_impressions_7': 0,
-                                                        'social_clicks_7': 0,
-                                                        'social_clicksUnique_7': 0
-                                                        }},
-                                              upsert=True)
+            data[x['user']].update({'totalCost_7': x['totalCost'],
+                                    'impressions_block_7': x['impressions_block'],
+                                    'impressions_7': x['impressions'],
+                                    'clicks_7': x['clicks'],
+                                    'clicksUnique_7': x['clicksUnique'],
+                                    'social_impressions_7': x['social_impressions'],
+                                    'social_clicks_7': x['social_clicks'],
+                                    'social_clicksUnique_7': x['social_clicksUnique']
+                                    })
 
         for x in cur30:
-            self.db.stats.user.summary.update({'user': x['user']},
-                                              {'$set': {'totalCost_30': x['totalCost'],
-                                                        'impressions_block_30': x['impressions_block'],
-                                                        'impressions_30': x['impressions'],
-                                                        'clicks_30': x['clicks'],
-                                                        'clicksUnique_30': x['clicksUnique'],
-                                                        'social_impressions_30': x['social_impressions'],
-                                                        'social_clicks_30': x['social_clicks'],
-                                                        'social_clicksUnique_30': x['social_clicksUnique']
-                                                        }},
-                                              upsert=True)
-            if x['user'] in userStats30:
-                userStats30.remove(x['user'])
-        for x in userStats30:
-            self.db.stats.user.summary.update({'user': x},
-                                              {'$set': {'totalCost_30': 0,
-                                                        'impressions_block_30': 0,
-                                                        'impressions_30': 0,
-                                                        'clicks_30': 0,
-                                                        'clicksUnique_30': 0,
-                                                        'social_impressions_30': 0,
-                                                        'social_clicks_30': 0,
-                                                        'social_clicksUnique_30': 0
-                                                        }},
-                                              upsert=True)
+            data[x['user']].update({'totalCost_30': x['totalCost'],
+                                    'impressions_block_30': x['impressions_block'],
+                                    'impressions_30': x['impressions'],
+                                    'clicks_30': x['clicks'],
+                                    'clicksUnique_30': x['clicksUnique'],
+                                    'social_impressions_30': x['social_impressions'],
+                                    'social_clicks_30': x['social_clicks'],
+                                    'social_clicksUnique_30': x['social_clicksUnique']
+                                    })
 
         for x in cur365:
-            self.db.stats.user.summary.update({'user': x['user']},
-                                              {'$set': {'totalCost_365': x['totalCost'],
-                                                        'impressions_block_365': x['impressions_block'],
-                                                        'impressions_365': x['impressions'],
-                                                        'clicks_365': x['clicks'],
-                                                        'clicksUnique_365': x['clicksUnique'],
-                                                        'social_impressions_365': x['social_impressions'],
-                                                        'social_clicks_365': x['social_clicks'],
-                                                        'social_clicksUnique_365': x['social_clicksUnique']
-                                                        }},
-                                              upsert=True)
-            if x['user'] in userStats365:
-                userStats365.remove(x['user'])
-        for x in userStats365:
-            self.db.stats.user.summary.update({'user': x},
-                                              {'$set': {'totalCost_365': 0,
-                                                        'impressions_block_365': 0,
-                                                        'impressions_365': 0,
-                                                        'clicks_365': 0,
-                                                        'clicksUnique_365': 0,
-                                                        'social_impressions_365': 0,
-                                                        'social_clicks_365': 0,
-                                                        'social_clicksUnique_365': 0
-                                                        }},
-                                              upsert=True)
+            data[x['user']].update({'totalCost_365': x['totalCost'],
+                                    'impressions_block_365': x['impressions_block'],
+                                    'impressions_365': x['impressions'],
+                                    'clicks_365': x['clicks'],
+                                    'clicksUnique_365': x['clicksUnique'],
+                                    'social_impressions_365': x['social_impressions'],
+                                    'social_clicks_365': x['social_clicks'],
+                                    'social_clicksUnique_365': x['social_clicksUnique']
+                                    })
 
         # Доход
         inc = {}
@@ -1080,49 +1054,71 @@ class GetmyadStats(object):
         for item in outcome:
             outc[item.get('user.login')] = item.get('sum', 0.0)
         for key, value in inc.iteritems():
-            self.db.stats.user.summary.update({'user': key},
-                                              {'$set': {'summ': (float(value) - float(outc.get(key, 0.0)))}},
-                                              upsert=False)
+            data[key].update({'summ': (float(value) - float(outc.get(key, 0.0)))})
 
-        registrationDate = {}
-        for item in self.db.users.find({}, {'login': 1, 'registrationDate': 1, '_id': 0}):
-            registrationDate[item.get('login')] = item.get('registrationDate')
+        pipeline = [
+            {'$match':
+                 {'date': date}
+             },
+            {'$group': {
+                '_id': {'user': '$user', 'domain': '$domain'},
+                'c': {'$sum': '$clicks'},
+                'i': {'$sum': '$impressions'}
+            },
+            },
+            {'$group': {
+                '_id': '$_id.user',
+                'count': {'$sum': {"$cond": [
+                    {'$or': [
+                        {"$gt": ["$c", 0]},
+                        {"$gte": ["$i", 100]}
+                    ]},
+                    1,
+                    0
+                ]}}
+            },
+            }
+        ]
+        domain_activity = defaultdict(int)
+        cursor = self.db.stats.daily.domain.aggregate(pipeline=pipeline, cursor={})
+        for i in cursor:
+            domain_activity[i['_id']] = i['count']
 
-        domain_data = {}
-        for x in self.db.stats.daily.domain.find({'date': date}):
-            key = (x.get('user'), x.get('domain'))
-            data = domain_data.setdefault(key, {'clicks': 0,
-                                                'imps': 0})
-            data['clicks'] += x.get('clicks', 0)
-            data['imps'] += x.get('impressions', 0)
-
-        domain_activity = {}
-        for k, v in domain_data.iteritems():
-            user = k[0]
-            domain_activity.setdefault(user, 0)
-            if v['clicks'] > 0 or v['imps'] >= 100:
-                domain_activity[user] += 1
-        for item in self.db.stats.user.summary.find():
+        for key, value in data.iteritems():
             activity = 'orangeflag'
             activity_yesterday = 'orangeflag'
             activity_before_yesterday = 'orangeflag'
-            if item.get('impressions_block_2', 0) > 100:
+            if value.get('impressions_block_2', 0) > 100:
                 activity_yesterday = 'greenflag'
-            if item.get('impressions_block_3', 0) > 100:
+            if value.get('impressions_block_3', 0) > 100:
                 activity_before_yesterday = 'greenflag'
-            if item.get('impressions_block', 0) > 100:
+            if value.get('impressions_block', 0) > 100:
                 activity = 'greenflag'
             if (activity == 'orangeflag') and (
                         (activity_yesterday != 'orangeflag') or (activity_before_yesterday != 'orangeflag')):
                 activity = 'redflag'
-            item['activity'] = activity
-            item['activity_yesterday'] = activity_yesterday
-            item['activity_before_yesterday'] = activity_before_yesterday
-            item['registrationDate'] = registrationDate.get(item['user'])
-            item['active_domains'] = {'today': domain_activity.get(item['user'], 0),
-                                      'yesterday': 0,
-                                      'before_yesterday': 0}
-            self.db.stats.user.summary.save(item)
+            data[key].update({
+                'activity': activity,
+                'activity_yesterday': activity_yesterday,
+                'activity_before_yesterday': activity_yesterday,
+                'active_domains': {'today': domain_activity[key],
+                                   'yesterday': 0,
+                                   'before_yesterday': 0}
+
+            })
+
+        operations = []
+
+        for key, value in data.iteritems():
+            try:
+                operations.append(pymongo.UpdateOne({'user': key}, {'$set': value}, upsert=True))
+            except Exception as ex:
+                print(ex, "stats.user data", key, value)
+
+        try:
+            self.db.stats.user.summary.bulk_write(operations, ordered=False)
+        except BulkWriteError as bwe:
+            print(bwe.details)
 
         act_acc_count = 0
         domains_today = 0
@@ -1132,6 +1128,7 @@ class GetmyadStats(object):
             if x['activity'] == 'greenflag':
                 act_acc_count += 1
             domains_today += x.get('active_domains', {}).get('today', 0)
+
         self.db.stats.daily.all.update({'date': date},
                                        {'$set': {'act_acc_count': act_acc_count,
                                                  'domains_today': domains_today,
