@@ -73,22 +73,22 @@ class GetmyadStats(object):
 
         self.db.reset_error_history()
 
-        operations = []
-        for key, value in ip_buffer.iteritems():
-            try:
-                operations.append(
-                    pymongo.UpdateOne(
-                        {'ip': key[1], 'date': key[0]},
-                        {'$inc': {'impressions_retargeting': value}},
-                        upsert=True
-                    )
-                )
-            except Exception as ex:
-                print(ex, "ip_buffer", key, value)
-        try:
-            self.db.ip.stats.daily.raw.bulk_write(operations, ordered=False)
-        except BulkWriteError as bwe:
-            print(bwe.details)
+        # operations = []
+        # for key, value in ip_buffer.iteritems():
+        #     try:
+        #         operations.append(
+        #             pymongo.UpdateOne(
+        #                 {'ip': key[1], 'date': key[0]},
+        #                 {'$inc': {'impressions_retargeting': value}},
+        #                 upsert=True
+        #             )
+        #         )
+        #     except Exception as ex:
+        #         print(ex, "ip_buffer", key, value)
+        # try:
+        #     self.db.ip.stats.daily.raw.bulk_write(operations, ordered=False)
+        # except BulkWriteError as bwe:
+        #     print(bwe.details)
 
         elapsed = (datetime.datetime.now() - elapsed_start_time).seconds
         print('%s seconds, %s records processed. \n' % (elapsed, processed_records))
@@ -182,27 +182,27 @@ class GetmyadStats(object):
         except BulkWriteError as bwe:
             print(bwe.details)
 
-        operations = []
-
-        for key, value in ip_buffer.iteritems():
-            try:
-                operations.append(
-                    pymongo.UpdateOne(
-                        {'ip': key[1], 'date': key[0]},
-                        {'$inc': {
-                            'impressions_block': value[0],
-                            'impressions_block_valid': value[1],
-                            'impressions_block_not_valid': value[2],
-                        }},
-                        upsert=True)
-                )
-            except Exception as ex:
-                print(ex, "ip_buffer", key, value)
-
-        try:
-            self.db.ip.stats.daily.raw.bulk_write(operations, ordered=False)
-        except BulkWriteError as bwe:
-            print(bwe.details)
+        # operations = []
+        #
+        # for key, value in ip_buffer.iteritems():
+        #     try:
+        #         operations.append(
+        #             pymongo.UpdateOne(
+        #                 {'ip': key[1], 'date': key[0]},
+        #                 {'$inc': {
+        #                     'impressions_block': value[0],
+        #                     'impressions_block_valid': value[1],
+        #                     'impressions_block_not_valid': value[2],
+        #                 }},
+        #                 upsert=True)
+        #         )
+        #     except Exception as ex:
+        #         print(ex, "ip_buffer", key, value)
+        #
+        # try:
+        #     self.db.ip.stats.daily.raw.bulk_write(operations, ordered=False)
+        # except BulkWriteError as bwe:
+        #     print(bwe.details)
 
         elapsed = (datetime.datetime.now() - elapsed_start_time).seconds
         print('%s seconds, %s records processed. \n' % (elapsed, processed_records))
@@ -329,29 +329,29 @@ class GetmyadStats(object):
         except BulkWriteError as bwe:
             print(bwe.details)
 
-        operations = []
-        for key, value in ip_buffer.iteritems():
-            try:
-                operations.append(
-                    pymongo.UpdateOne({'ip': key[1],
-                                       'date': key[0]},
-                                      {'$inc':
-                                          {
-                                              'impressions': value[0],
-                                              'place_impressions': value[1],
-                                              'social_impressions': value[2],
-                                              'retargeting_impressions': value[3],
-                                              'recommended_impressions': value[4]
-                                          }},
-                                      upsert=True)
-                )
-            except Exception as ex:
-                print(ex, "ip_buffer", key, value)
-
-        try:
-            self.db.ip.stats.daily.raw.bulk_write(operations, ordered=False)
-        except BulkWriteError as bwe:
-            print(bwe.details)
+        # operations = []
+        # for key, value in ip_buffer.iteritems():
+        #     try:
+        #         operations.append(
+        #             pymongo.UpdateOne({'ip': key[1],
+        #                                'date': key[0]},
+        #                               {'$inc':
+        #                                   {
+        #                                       'impressions': value[0],
+        #                                       'place_impressions': value[1],
+        #                                       'social_impressions': value[2],
+        #                                       'retargeting_impressions': value[3],
+        #                                       'recommended_impressions': value[4]
+        #                                   }},
+        #                               upsert=True)
+        #         )
+        #     except Exception as ex:
+        #         print(ex, "ip_buffer", key, value)
+        #
+        # try:
+        #     self.db.ip.stats.daily.raw.bulk_write(operations, ordered=False)
+        # except BulkWriteError as bwe:
+        #     print(bwe.details)
 
         operations = []
         for key, value in worker_stats.iteritems():
