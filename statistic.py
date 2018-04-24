@@ -274,6 +274,7 @@ class GetmyadStats(object):
                                     processed_records += 1
                                     buffer[key][0] += 1
 
+                            branch = x.get('branch', 'NOT')
                             ip = x.get('ip')
                             if ip:
                                 key = (dt, ip)
@@ -288,7 +289,6 @@ class GetmyadStats(object):
                                     else:
                                         ip_buffer[key][1] += 1
 
-                            branch = x.get('branch', 'NOT')
                             stats_key = (branch, dt, x.get('conformity', 'NOT'))
                             stats_key_all = (branch, dt, 'ALL')
                             worker_stats[stats_key] += 1
