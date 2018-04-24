@@ -329,6 +329,7 @@ class GetmyadStats(object):
         except BulkWriteError as bwe:
             print(bwe.details)
 
+        operations = []
         for key, value in ip_buffer.iteritems():
             try:
                 operations.append(
@@ -352,6 +353,7 @@ class GetmyadStats(object):
         except BulkWriteError as bwe:
             print(bwe.details)
 
+        operations = []
         for key, value in worker_stats.iteritems():
             try:
                 operations.append(
