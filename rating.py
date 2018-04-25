@@ -4,6 +4,7 @@ from collections import defaultdict
 
 import bson.objectid
 import pymongo
+from pymongo.errors import BulkWriteError
 
 from mq import MQ
 
@@ -74,29 +75,59 @@ class GetmyadRating(object):
                 pass
 
         self.db.reset_error_history()
+
+        operations_offer = []
+        operations_stats_daily = []
+        operations_campaign = []
+
         for key, value in rating_buffer.iteritems():
             try:
-                self.db.offer.update({'guid': key[0]},
-                                     {'$inc': {'impressions': value, 'full_impressions': value}}, False)
-                self.db.stats_daily.rating.update({'adv': key[1],
-                                                   'adv_int': key[4],
-                                                   'guid': key[0],
-                                                   'guid_int': key[3],
-                                                   'campaignId': key[2],
-                                                   'campaignId_int': key[5]
-                                                   },
-                                                  {'$inc': {'impressions': value, 'full_impressions': value}},
-                                                  upsert=True)
+                operations_offer.append(
+                    pymongo.UpdateOne({'guid': key[0]},
+                                      {'$inc': {'impressions': value, 'full_impressions': value}}, upsert=False)
+                )
             except Exception as ex:
-                print(ex, "rating_buffer", key, value)
-
-        for key, value in campaign_rating_buffer.iteritems():
+                print(ex, "worker_stats", key, value)
             try:
-                self.db.campaign.rating.update(
-                    {'adv': key[0], 'adv_int': key[2], 'campaignId': key[1], 'campaignId_int': key[3]},
-                    {'$inc': {'impressions': value, 'full_impressions': value}}, True)
+                operations_stats_daily.append(
+                    pymongo.UpdateOne({'adv_int': key[4],
+                                       'guid_int': key[3],
+                                       'campaignId_int': key[5]
+                                       },
+                                      {
+                                          '$inc': {'impressions': value, 'full_impressions': value},
+                                          '$set': {'adv': key[1], 'guid': key[0], 'campaignId': key[2]}
+                                      },
+                                      upsert=True)
+                )
             except Exception as ex:
-                print(ex, "campaign_rating_buffer", key, value)
+                print(ex, "worker_stats", key, value)
+
+        # for key, value in campaign_rating_buffer.iteritems():
+        #     try:
+        #         operations_campaign.append(
+        #             pymongo.UpdateOne(
+        #                 {'adv': key[0], 'adv_int': key[2], 'campaignId': key[1], 'campaignId_int': key[3]},
+        #                 {'$inc': {'impressions': value, 'full_impressions': value}}, upsert=True)
+        #         )
+        #     except Exception as ex:
+        #         print(ex, "worker_stats", key, value)
+
+        try:
+            self.db.offer.bulk_write(operations_offer, ordered=False)
+        except BulkWriteError as bwe:
+            print(bwe.details)
+
+        try:
+            self.db.stats_daily.rating.bulk_write(operations_stats_daily, ordered=False)
+        except BulkWriteError as bwe:
+            print(bwe.details)
+
+        # try:
+        #     self.db.campaign.rating.bulk_write(operations_campaign, ordered=False)
+        # except BulkWriteError as bwe:
+        #     print(bwe.details)
+
         elapsed = (datetime.datetime.now() - elapsed_start_time).seconds
         print("Stop import rating Data in %s second" % elapsed)
         if self.db.previous_error():
@@ -121,40 +152,64 @@ class GetmyadRating(object):
             print("importClicksFromMongo: nothing to do")
             return
 
-        offer_cost = {}
-        buffer_click = []
         processed_records = 0
-        for x in cursor:
+        operations_offer = []
+        operations_stats_daily = []
+        operations_campaign = []
 
+        for x in cursor:
             if last_processed_id is not None and x['_id'] == last_processed_id:
                 break
-            buffer_click.append(x)
+            processed_records += 1
+            if x['unique']:
+                value = {'$inc': {'clicks': 1, 'full_clicks': 1}}
+                try:
+                    operations_stats_daily.append(
+                        pymongo.UpdateOne({'adv': x['inf'],
+                                           'guid': x['offer'],
+                                           'campaignId': x['campaignId']},
+                                          value,
+                                          upsert=False)
+                    )
+                except Exception as ex:
+                    print(ex, "worker_stats", x)
+                # try:
+                #     operations_campaign.append(
+                #         pymongo.UpdateOne(
+                #             {'adv': x['inf'], 'campaignId': x['campaignId']},
+                #             value, upsert=False)
+                #     )
+                # except Exception as ex:
+                #     print(ex, "worker_stats", x)
+
+                try:
+                    value['$max'] = {'cost': float(x.get('adload_cost', 0.0))}
+                    operations_offer.append(
+                        pymongo.UpdateOne({'guid': x['offer']},
+                                          value, upsert=False)
+                    )
+                except Exception as ex:
+                    print(ex, "worker_stats", x)
 
         self.db.config.update({'key': 'clicks rating last _id'}, {'$set': {'value': end_id}}, True)
 
-        for x in buffer_click:
-            processed_records += 1
+        try:
+            self.db.offer.bulk_write(operations_offer, ordered=False)
+        except BulkWriteError as bwe:
+            print(bwe.details)
 
-            if float(x['adload_cost']) > 0.0:
-                offer_cost[x['offer']] = x['adload_cost']
-            if x['unique']:
-                self.db.offer.update({'guid': x['offer']},
-                                     {'$inc': {'clicks': 1, 'full_clicks': 1}}, upsert=False)
+        try:
+            self.db.stats_daily.rating.bulk_write(operations_stats_daily, ordered=False)
+        except BulkWriteError as bwe:
+            print(bwe.details)
 
-                self.db.stats_daily.rating.update({'adv': x['inf'],
-                                                   'guid': x['offer'],
-                                                   'campaignId': x['campaignId']},
-                                                  {'$inc': {'clicks': 1, 'full_clicks': 1}}, upsert=False)
-
-                self.db.campaign.rating.update({'adv': x['inf'], 'campaignId': x['campaignId']},
-                                               {'$inc': {'clicks': 1, 'full_clicks': 1}}, False)
+        # try:
+        #     self.db.campaign.rating.bulk_write(operations_campaign, ordered=False)
+        # except BulkWriteError as bwe:
+        #     print(bwe.details)
 
         print("Finished %s records in %s seconds" % (
             processed_records, (datetime.datetime.now() - elapsed_start_time).seconds))
-
-        print("update offer cost - %s" % len(offer_cost))
-        for key, value in offer_cost.iteritems():
-            self.db.offer.update({'guid': key}, {'$set': {'cost': value}}, upsert=False)
 
     def createOfferRating(self):
         msg = {}
@@ -164,9 +219,12 @@ class GetmyadRating(object):
                               '_id': -1
                           })]
         queri = {"campaignId": {"$in": campaignIdList}}
-        offers = self.db.offer.find(queri)
+        fields = {'_id': 0, 'impressions': 1, 'clicks': 1, 'full_impressions': 1, 'full_clicks': 1, 'cost': 1,
+                  'guid': 1, 'campaignId': 1}
+        offers = self.db.offer.find(queri, fields)
         offer_count = 0
         date_update = datetime.datetime.now()
+        operations = []
         for offer in offers:
             udata = {}
             impressions = offer.get('impressions', 0)
@@ -174,7 +232,7 @@ class GetmyadRating(object):
             full_impressions = offer.get('full_impressions', 0)
             full_clicks = offer.get('full_clicks', 0)
             offer_cost = offer.get('cost', 0.1)
-            if (clicks and impressions) > 0:
+            if clicks and impressions > 0:
                 ctr = ((float(clicks) / impressions) * 100)
             else:
                 ctr = 0
@@ -183,72 +241,82 @@ class GetmyadRating(object):
                 full_ctr = ((float(full_clicks) / full_impressions) * 100)
             else:
                 full_ctr = 0
-            if (impressions > 1500):
+            if impressions > 1500:
                 rating = (ctr * offer_cost) * 100000
                 udata['rating'] = round(rating, 4)
                 udata['last_rating_update'] = date_update
                 udata['old_impressions'] = impressions
                 udata['old_clicks'] = clicks
-            if (full_impressions > 1500):
+            if full_impressions > 1500:
                 rating = (full_ctr * offer_cost) * 100000
                 udata['full_rating'] = round(rating, 4)
                 udata['last_full_rating_update'] = date_update
                 offer_count += 1
                 msg[offer['guid']] = offer['campaignId']
             if len(udata) > 0:
-                self.db.offer.update({'guid': offer['guid']}, \
-                                     {'$set': udata}, upsert=False)
+                try:
+                    operations.append(
+                        pymongo.UpdateOne({'guid': offer['guid']}, {'$set': udata}, upsert=False)
+                    )
+                except Exception as ex:
+                    print(ex, "buffer", offer['guid'], udata)
+
+        try:
+            self.db.offer.bulk_write(operations, ordered=False)
+        except BulkWriteError as bwe:
+            print(bwe.details)
+
         for key, value in msg.iteritems():
             self.mq.offer_update(key, value)
         self.mq.offer_rating_update()
         print("Created %d rating for offer" % offer_count)
 
     def createCampaignRatingForInformers(self):
-        date_update = datetime.datetime.now()
-        costs = defaultdict(list)
-        for item in self.db.offer.find({}, {'campaignId': True, 'cost': True}):
-            costs[item['campaignId']].append(item['cost'])
-        campaigns = self.db.campaign.rating.find()
-        for campaign in campaigns:
-            udata = {}
-            impressions = campaign.get('impressions', 0)
-            clicks = campaign.get('clicks', 0)
-            full_impressions = campaign.get('full_impressions', 0)
-            full_clicks = campaign.get('full_clicks', 0)
-            cost = costs.get(campaign['campaignId'], [0.5])
-            if len(cost) > 0:
-                cost = sum(cost) / len(cost)
-            else:
-                cost = 0.5
-            if (clicks and impressions) > 0:
-                ctr = ((float(clicks) / impressions) * 100)
-            else:
-                ctr = 0
-
-            if (full_clicks and full_impressions) > 0:
-                full_ctr = ((float(full_clicks) / full_impressions) * 100)
-            else:
-                full_ctr = 0
-            if (impressions > 1500):
-                rating = (ctr * cost) * 100000
-                udata['rating'] = round(rating, 4)
-                udata['last_rating_update'] = date_update
-                udata['old_impressions'] = impressions
-                udata['cost'] = cost
-                udata['old_clicks'] = clicks
-
-            if (full_impressions > 1500):
-                rating = (full_ctr * cost) * 100000
-                udata['full_rating'] = round(rating, 4)
-                udata['cost'] = cost
-                udata['last_full_rating_update'] = date_update
-
-            if len(udata) > 0:
-                self.db.campaign.rating.update({'campaignId': campaign['campaignId'],
-                                                'campaignId_int': campaign['campaignId_int'],
-                                                'adv': campaign['adv'],
-                                                'adv_int': campaign['adv_int']},
-                                               {'$set': udata}, upsert=False)
+        # date_update = datetime.datetime.now()
+        # costs = defaultdict(list)
+        # for item in self.db.offer.find({}, {'campaignId': True, 'cost': True}):
+        #     costs[item['campaignId']].append(item['cost'])
+        # campaigns = self.db.campaign.rating.find()
+        # for campaign in campaigns:
+        #     udata = {}
+        #     impressions = campaign.get('impressions', 0)
+        #     clicks = campaign.get('clicks', 0)
+        #     full_impressions = campaign.get('full_impressions', 0)
+        #     full_clicks = campaign.get('full_clicks', 0)
+        #     cost = costs.get(campaign['campaignId'], [0.5])
+        #     if len(cost) > 0:
+        #         cost = sum(cost) / len(cost)
+        #     else:
+        #         cost = 0.5
+        #     if (clicks and impressions) > 0:
+        #         ctr = ((float(clicks) / impressions) * 100)
+        #     else:
+        #         ctr = 0
+        #
+        #     if (full_clicks and full_impressions) > 0:
+        #         full_ctr = ((float(full_clicks) / full_impressions) * 100)
+        #     else:
+        #         full_ctr = 0
+        #     if (impressions > 1500):
+        #         rating = (ctr * cost) * 100000
+        #         udata['rating'] = round(rating, 4)
+        #         udata['last_rating_update'] = date_update
+        #         udata['old_impressions'] = impressions
+        #         udata['cost'] = cost
+        #         udata['old_clicks'] = clicks
+        #
+        #     if (full_impressions > 1500):
+        #         rating = (full_ctr * cost) * 100000
+        #         udata['full_rating'] = round(rating, 4)
+        #         udata['cost'] = cost
+        #         udata['last_full_rating_update'] = date_update
+        #
+        #     if len(udata) > 0:
+        #         self.db.campaign.rating.update({'campaignId': campaign['campaignId'],
+        #                                         'campaignId_int': campaign['campaignId_int'],
+        #                                         'adv': campaign['adv'],
+        #                                         'adv_int': campaign['adv_int']},
+        #                                        {'$set': udata}, upsert=False)
         self.mq.campaign_rating_update()
 
     def createOfferRatingForInformers(self):
@@ -276,6 +344,7 @@ class GetmyadRating(object):
             costs[item['guid']] = [item['cost'], item['title']]
 
         offers = self.db.stats_daily.rating.find(queri)
+        operations = []
         for offer in offers:
             udata = {}
             impressions = offer.get('impressions', 0)
@@ -283,7 +352,7 @@ class GetmyadRating(object):
             full_impressions = offer.get('full_impressions', 0)
             full_clicks = offer.get('full_clicks', 0)
             offer_cost, offer_title = costs.get(offer['guid'], [0.5, ''])
-            campaignTitle = campaign.get(offer['campaignId'],'')
+            campaignTitle = campaign.get(offer['campaignId'], '')
             if (clicks and impressions) > 0:
                 ctr = ((float(clicks) / impressions) * 100)
             else:
@@ -321,13 +390,20 @@ class GetmyadRating(object):
                 udata['title'] = offer_title
                 udata['campaignTitle'] = campaignTitle
             if len(udata) > 0:
-                self.db.stats_daily.rating.update({'guid': offer['guid'],
-                                                   'guid_int': offer['guid_int'],
-                                                   'campaignId': offer['campaignId'],
-                                                   'campaignId_int': offer['campaignId_int'],
-                                                   'adv': offer['adv'],
-                                                   'adv_int': offer['adv_int']},
-                                                  {'$set': udata}, upsert=False)
+                try:
+                    operations.append(
+                        pymongo.UpdateOne({'guid_int': offer['guid_int'],
+                                           'campaignId_int': offer['campaignId_int'],
+                                           'adv_int': offer['adv_int']},
+                                          {'$set': udata}, upsert=False)
+                    )
+                except Exception as ex:
+                    print(ex, "buffer", offer['guid'], udata)
+
+        try:
+            self.db.stats_daily.rating.bulk_write(operations, ordered=False)
+        except BulkWriteError as bwe:
+            print(bwe.details)
 
         for key, value in msg.iteritems():
             self.mq.rating_informer_update(value)
