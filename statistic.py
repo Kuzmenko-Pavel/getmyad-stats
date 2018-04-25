@@ -455,12 +455,12 @@ class GetmyadStats(object):
             ip_data['all_clicks'] = 1
             ip_data['unique_clicks'] = 1 if x['unique'] else 0
 
-            self.db.ip.stats.daily.raw.update({
-                'ip': x['ip'],
-                'date': datetime.datetime.fromordinal(x['dt'].toordinal())
-            }, {
-                '$inc': ip_data
-            })
+            # self.db.ip.stats.daily.raw.update({
+            #     'ip': x['ip'],
+            #     'date': datetime.datetime.fromordinal(x['dt'].toordinal())
+            # }, {
+            #     '$inc': ip_data
+            # })
 
         print("Finished %s records in %s seconds" %
               (processed_records, (datetime.datetime.now() - elapsed_start_time).seconds))
