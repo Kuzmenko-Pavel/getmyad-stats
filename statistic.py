@@ -1152,7 +1152,7 @@ class GetmyadStats(object):
                         self.db.stats.daily.domain.find({'date': date, 'impressions_block': {'$gte': 100}},
                                                         {'domain': 1, '_id': 0})]
         all_domain = []
-        for item in self.db.user.domains.find({
+        for item in self.db.domain.find({
             "domains": {
                 "$exists": True
             },
@@ -1160,7 +1160,7 @@ class GetmyadStats(object):
                 "$in": [item['login'] for item in self.db.users.find({"manager": False})]
             }
         }):
-            for x in item['domains']:
+            for x in item.get('domains', {}).values():
                 all_domain.append(x)
         category = {}
         cur = self.db.advertise.category.find()
@@ -1192,7 +1192,7 @@ class GetmyadStats(object):
         style1.font = font1
 
         wbk = xlwt.Workbook('utf-8')
-        sheet = wbk.add_sheet('Рубрикатор')
+        sheet = wbk.add_sheet('Рубрикатор %s' % date.strftime('%Y-%m-%d'))
         sheet.write(0, 0, 'Категория', style0)
         sheet.write(0, 1, 'Активный', style0)
         sheet.write(0, 2, 'Не активный', style0)
