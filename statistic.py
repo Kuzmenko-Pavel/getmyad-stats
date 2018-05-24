@@ -516,9 +516,11 @@ class GetmyadStats(object):
                     'impressions_block': {'$sum': '$impressions_block'},
                     'impressions_block_not_valid': {'$sum': '$impressions_block_not_valid'},
                     'impressions': {'$sum': '$impressions'},
+                    'impressions_not_valid': {'$sum': '$impressions_not_valid'},
                     'clicks': {'$sum': '$clicks'},
                     'clicksUnique': {'$sum': '$clicksUnique'},
                     'social_impressions': {'$sum': '$social_impressions'},
+                    'social_impressions_not_valid': {'$sum': '$social_impressions_not_valid'},
                     'social_clicks': {'$sum': '$social_clicks'},
                     'social_clicksUnique': {'$sum': '$social_clicksUnique'},
                     'view_seconds': {'$sum': '$view_seconds'},
@@ -547,19 +549,27 @@ class GetmyadStats(object):
             view_seconds = inf['view_seconds']
 
             impressions = int(inf['impressions'])
+            impressions_not_valid = int(inf['impressions_not_valid'])
             social_impressions = int(inf['social_impressions'])
+            social_impressions_not_valid = int(inf['social_impressions_not_valid'])
             impressions_block = int(inf['impressions_block'])
             impressions_block_not_valid = int(inf['impressions_block_not_valid'])
 
             difference_impressions_block = 100.0 * impressions_block / impressions_block_not_valid if (
                 impressions_block_not_valid > 0 and impressions_block_not_valid > impressions_block) else 100.0
+
             clicksUnique = int(inf['clicksUnique'])
+
             social_clicksUnique = int(inf['social_clicksUnique'])
+
             ctr_impressions_block = 100.0 * clicksUnique / impressions_block if (
                 clicksUnique > 0 and impressions_block > 0) else 0
+
             ctr_impressions = 100.0 * clicksUnique / impressions if (clicksUnique > 0 and impressions > 0) else 0
+
             ctr_social_impressions = 100.0 * social_clicksUnique / social_impressions if (
                 social_clicksUnique > 0 and social_impressions > 0) else 0
+
             ctr_difference_impressions = 100.0 * ctr_social_impressions / ctr_impressions if (
                 ctr_social_impressions > 0 and ctr_impressions > 0) else 0
 
@@ -576,9 +586,11 @@ class GetmyadStats(object):
                           'adload_cost': adload_cost,
                           'income': income,
                           'impressions': impressions,
+                          'impressions_not_valid': impressions_not_valid,
                           'clicks': clicks,
                           'clicksUnique': clicksUnique,
                           'social_impressions': social_impressions,
+                          'social_impressions_not_valid': social_impressions_not_valid,
                           'social_clicks': social_clicks,
                           'social_clicksUnique': social_clicksUnique,
                           'ctr_impressions_block': ctr_impressions_block,
@@ -626,9 +638,11 @@ class GetmyadStats(object):
                     'impressions_block': {'$sum': '$impressions_block'},
                     'impressions_block_not_valid': {'$sum': '$impressions_block_not_valid'},
                     'impressions': {'$sum': '$impressions'},
+                    'impressions_not_valid': {'$sum': '$impressions_not_valid'},
                     'clicks': {'$sum': '$clicks'},
                     'clicksUnique': {'$sum': '$clicksUnique'},
                     'social_impressions': {'$sum': '$social_impressions'},
+                    'social_impressions_not_valid': {'$sum': '$social_impressions_not_valid'},
                     'social_clicks': {'$sum': '$social_clicks'},
                     'social_clicksUnique': {'$sum': '$social_clicksUnique'},
                     'view_seconds': {'$sum': '$view_seconds'}
@@ -647,7 +661,9 @@ class GetmyadStats(object):
             difference_impressions_block = 100.0 * impressions_block / impressions_block_not_valid if (
                 impressions_block_not_valid > 0 and impressions_block_not_valid > impressions_block) else 100.0
             impressions = int(x['impressions'])
+            impressions_not_valid = int(x['impressions_not_valid'])
             social_impressions = int(x['social_impressions'])
+            social_impressions_not_valid = int(x['social_impressions_not_valid'])
             clicksUnique = int(x['clicksUnique'])
             social_clicksUnique = int(x['social_clicksUnique'])
             ctr_impressions_block = 100.0 * clicksUnique / impressions_block if (
@@ -667,9 +683,11 @@ class GetmyadStats(object):
                           'impressions_block_not_valid': impressions_block_not_valid,
                           'difference_impressions_block': difference_impressions_block,
                           'impressions': impressions,
+                          'impressions_not_valid': impressions_not_valid,
                           'clicks': x['clicks'],
                           'clicksUnique': clicksUnique,
                           'social_impressions': social_impressions,
+                          'social_impressions_not_valid': social_impressions_not_valid,
                           'social_clicks': x['social_clicks'],
                           'social_clicksUnique': social_clicksUnique,
                           'ctr_impressions_block': ctr_impressions_block,
@@ -710,9 +728,11 @@ class GetmyadStats(object):
                     'impressions_block': {'$sum': '$impressions_block'},
                     'impressions_block_not_valid': {'$sum': '$impressions_block_not_valid'},
                     'impressions': {'$sum': '$impressions'},
+                    'impressions_not_valid': {'$sum': '$impressions_not_valid'},
                     'clicks': {'$sum': '$clicks'},
                     'clicksUnique': {'$sum': '$clicksUnique'},
                     'social_impressions': {'$sum': '$social_impressions'},
+                    'social_impressions_not_valid': {'$sum': '$social_impressions_not_valid'},
                     'social_clicks': {'$sum': '$social_clicks'},
                     'social_clicksUnique': {'$sum': '$social_clicksUnique'},
                     'view_seconds': {'$sum': '$view_seconds'}
@@ -731,7 +751,9 @@ class GetmyadStats(object):
             difference_impressions_block = 100.0 * impressions_block / impressions_block_not_valid if (
                 impressions_block_not_valid > 0 and impressions_block_not_valid > impressions_block) else 100.0
             impressions = int(x['impressions'])
+            impressions_not_valid = int(x['impressions_not_valid'])
             social_impressions = int(x['social_impressions'])
+            social_impressions_not_valid = int(x['social_impressions_not_valid'])
             clicksUnique = int(x['clicksUnique'])
             social_clicksUnique = int(x['social_clicksUnique'])
             ctr_impressions_block = 100.0 * clicksUnique / impressions_block if (
@@ -750,9 +772,11 @@ class GetmyadStats(object):
                           'impressions_block_not_valid': impressions_block_not_valid,
                           'difference_impressions_block': difference_impressions_block,
                           'impressions': impressions,
+                          'impressions_not_valid': impressions_not_valid,
                           'clicks': x['clicks'],
                           'clicksUnique': clicksUnique,
                           'social_impressions': social_impressions,
+                          'social_impressions_not_valid': social_impressions_not_valid,
                           'social_clicks': x['social_clicks'],
                           'social_clicksUnique': social_clicksUnique,
                           'ctr_impressions_block': ctr_impressions_block,
@@ -793,9 +817,11 @@ class GetmyadStats(object):
                     'impressions_block': {'$sum': '$impressions_block'},
                     'impressions_block_not_valid': {'$sum': '$impressions_block_not_valid'},
                     'impressions': {'$sum': '$impressions'},
+                    'impressions_not_valid': {'$sum': '$impressions_not_valid'},
                     'clicks': {'$sum': '$clicks'},
                     'clicksUnique': {'$sum': '$clicksUnique'},
                     'social_impressions': {'$sum': '$social_impressions'},
+                    'social_impressions_not_valid': {'$sum': '$social_impressions_not_valid'},
                     'social_clicks': {'$sum': '$social_clicks'},
                     'social_clicksUnique': {'$sum': '$social_clicksUnique'},
                     'view_seconds': {'$sum': '$view_seconds'}
@@ -812,7 +838,9 @@ class GetmyadStats(object):
             difference_impressions_block = 100.0 * impressions_block / impressions_block_not_valid if (
                 impressions_block_not_valid > 0 and impressions_block_not_valid > impressions_block) else 100.0
             impressions = int(x['impressions'])
+            impressions_not_valid = int(x['impressions_not_valid'])
             social_impressions = int(x['social_impressions'])
+            social_impressions_not_valid = int(x['social_impressions_not_valid'])
             clicksUnique = int(x['clicksUnique'])
             social_clicksUnique = int(x['social_clicksUnique'])
             ctr_impressions_block = 100.0 * clicksUnique / impressions_block if (
@@ -830,9 +858,11 @@ class GetmyadStats(object):
                           'impressions_block_not_valid': impressions_block_not_valid,
                           'difference_impressions_block': difference_impressions_block,
                           'impressions': impressions,
+                          'impressions_not_valid': impressions_not_valid,
                           'clicks': x['clicks'],
                           'clicksUnique': clicksUnique,
                           'social_impressions': social_impressions,
+                          'social_impressions_not_valid': social_impressions_not_valid,
                           'social_clicks': x['social_clicks'],
                           'social_clicksUnique': social_clicksUnique,
                           'ctr_impressions_block': ctr_impressions_block,
