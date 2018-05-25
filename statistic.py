@@ -224,7 +224,7 @@ class GetmyadStats(object):
         u"""Mongo worker data import"""
         elapsed_start_time = datetime.datetime.now()
 
-        buffer = defaultdict(lambda: [0, 0])
+        buffer = defaultdict(lambda: [0, 0, 0, 0])
         worker_stats = defaultdict(int)
         ip_buffer = defaultdict(lambda: [0, 0, 0, 0, 0])
         processed_records = 0
@@ -269,10 +269,12 @@ class GetmyadStats(object):
                                     processed_social_records += 1
                                     processed_records += 1
                                     buffer[key][1] += 1
+                                    buffer[key][3] += 1
                                 else:
                                     processed_paymend_records += 1
                                     processed_records += 1
                                     buffer[key][0] += 1
+                                    buffer[key][2] += 1
 
                             branch = x.get('branch', 'NOT')
                             ip = x.get('ip')
@@ -317,7 +319,9 @@ class GetmyadStats(object):
                                       {'$inc':
                                           {
                                               'impressions': value[0],
-                                              'social_impressions': value[1]
+                                              'social_impressions': value[1],
+                                              'impressions_not_valid': value[2],
+                                              'social_impressions_not_valid': value[3],
                                           }},
                                       upsert=False)
                 )
