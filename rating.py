@@ -54,10 +54,10 @@ class GetmyadRating(object):
 
                             key_rating = (
                                 x['id'], x['inf'].lower(), x['campaignId'].lower(),
-                                x['id_int'], x['inf_int'], x['campaignId_int']
+                                int(x['id_int']), int(x['inf_int']), int(x['campaignId_int'])
                             )
                             campaign_key_rating = (
-                                x['inf'].lower(), x['campaignId'].lower(), x['inf_int'], x['campaignId_int']
+                                x['inf'].lower(), x['campaignId'].lower(), int(x['inf_int']), int(x['campaignId_int'])
                             )
                             campaign_rating_buffer[campaign_key_rating] += 1
                             if not x.get('retargeting', False):
@@ -90,9 +90,9 @@ class GetmyadRating(object):
                 print(ex, "worker_stats", key, value)
             try:
                 operations_stats_daily.append(
-                    pymongo.UpdateOne({'adv_int': key[4],
-                                       'guid_int': key[3],
-                                       'campaignId_int': key[5]
+                    pymongo.UpdateOne({'adv_int': int(key[4]),
+                                       'guid_int': int(key[3]),
+                                       'campaignId_int': int(key[5])
                                        },
                                       {
                                           '$inc': {'impressions': value, 'full_impressions': value},
