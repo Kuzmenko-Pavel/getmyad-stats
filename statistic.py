@@ -242,8 +242,7 @@ class GetmyadStats(object):
                     last_processed_id = None
 
                 try:
-                    cursor = db2['log.impressions'].find({}, {'title': False, 'campaignTitle': False}).sort("$natural",
-                                                                                                            pymongo.DESCENDING)
+                    cursor = db2['log.impressions'].find({}).sort("$natural", pymongo.DESCENDING)
                 except Exception as e:
                     print("Cursor ERROR", e)
                     continue
@@ -263,18 +262,24 @@ class GetmyadStats(object):
                             dt = datetime.datetime(n.year, n.month, n.day)
 
                             key = (x['inf'].lower(), dt)
+                            request = x['inf'].get('request', 'initial')
+                            active = x['inf'].get('active', 'initial')
 
                             if not x.get('test', False):
                                 if x.get('social', False):
-                                    processed_social_records += 1
-                                    processed_records += 1
-                                    buffer[key][1] += 1
-                                    buffer[key][3] += 1
+                                    if active == 'initial' and request == 'initial':
+                                        processed_social_records += 1
+                                        processed_records += 1
+                                        buffer[key][3] += 1
+                                    if active == 'initial':
+                                        buffer[key][1] += 1
                                 else:
-                                    processed_paymend_records += 1
-                                    processed_records += 1
-                                    buffer[key][0] += 1
-                                    buffer[key][2] += 1
+                                    if active == 'initial' and request == 'initial':
+                                        processed_paymend_records += 1
+                                        processed_records += 1
+                                        buffer[key][2] += 1
+                                    if active == 'initial':
+                                        buffer[key][0] += 1
 
                             branch = x.get('branch', 'NOT')
                             ip = x.get('ip')
