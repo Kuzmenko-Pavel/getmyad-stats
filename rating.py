@@ -21,7 +21,8 @@ class GetmyadRating(object):
         rating_buffer = defaultdict(int)
         campaign_rating_buffer = defaultdict(int)
         filds = {'_id': True, 'id': True, 'inf': True, 'campaignId': True,
-                 'id_int': True, 'inf_int': True, 'campaignId_int': True, 'retargeting': True}
+                 'id_int': True, 'inf_int': True, 'campaignId_int': True, 'retargeting': True,
+                 'request': True, 'active': True}
         print("Start import rating Data")
         for db2 in self.pool:
             try:
@@ -51,7 +52,8 @@ class GetmyadRating(object):
                         try:
                             if last_processed_id is not None and x['_id'] == last_processed_id:
                                 break
-
+                            request = x.get('request', 'initial')
+                            active = x.get('active', 'initial')
                             key_rating = (
                                 x['id'], x['inf'].lower(), x['campaignId'].lower(),
                                 int(x['id_int']), int(x['inf_int']), int(x['campaignId_int'])
@@ -59,9 +61,10 @@ class GetmyadRating(object):
                             campaign_key_rating = (
                                 x['inf'].lower(), x['campaignId'].lower(), int(x['inf_int']), int(x['campaignId_int'])
                             )
-                            campaign_rating_buffer[campaign_key_rating] += 1
-                            if not x.get('retargeting', False):
-                                rating_buffer[key_rating] += 1
+                            if active == 'initial' and request == 'initial':
+                                campaign_rating_buffer[campaign_key_rating] += 1
+                                if not x.get('retargeting', False):
+                                    rating_buffer[key_rating] += 1
                         except Exception as e:
                             print("Iteration error", e)
                             pass

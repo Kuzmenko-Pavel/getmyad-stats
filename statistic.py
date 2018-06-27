@@ -262,8 +262,8 @@ class GetmyadStats(object):
                             dt = datetime.datetime(n.year, n.month, n.day)
 
                             key = (x['inf'].lower(), dt)
-                            request = x['inf'].get('request', 'initial')
-                            active = x['inf'].get('active', 'initial')
+                            request = x.get('request', 'initial')
+                            active = x.get('active', 'initial')
 
                             if not x.get('test', False):
                                 if x.get('social', False):
