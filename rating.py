@@ -61,7 +61,7 @@ class GetmyadRating(object):
                             campaign_key_rating = (
                                 x['inf'].lower(), x['campaignId'].lower(), int(x['inf_int']), int(x['campaignId_int'])
                             )
-                            if active == 'initial' and request == 'initial':
+                            if active == 'complite' and request == 'initial':
                                 campaign_rating_buffer[campaign_key_rating] += 1
                                 if not x.get('retargeting', False):
                                     rating_buffer[key_rating] += 1

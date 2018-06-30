@@ -271,14 +271,14 @@ class GetmyadStats(object):
                                         processed_social_records += 1
                                         processed_records += 1
                                         buffer[key][3] += 1
-                                    if active == 'initial':
+                                    if active == 'complite':
                                         buffer[key][1] += 1
                                 else:
                                     if active == 'initial' and request == 'initial':
                                         processed_paymend_records += 1
                                         processed_records += 1
                                         buffer[key][2] += 1
-                                    if active == 'initial':
+                                    if active == 'complite':
                                         buffer[key][0] += 1
 
                             branch = x.get('branch', 'NOT')
@@ -298,8 +298,9 @@ class GetmyadStats(object):
 
                             stats_key = (branch, dt, x.get('conformity', 'NOT'))
                             stats_key_all = (branch, dt, 'ALL')
-                            worker_stats[stats_key] += 1
-                            worker_stats[stats_key_all] += 1
+                            if active == 'complite':
+                                worker_stats[stats_key] += 1
+                                worker_stats[stats_key_all] += 1
                         except Exception as e:
                             print("Iteration error", e)
                             pass
