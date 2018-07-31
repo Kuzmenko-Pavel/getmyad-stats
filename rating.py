@@ -185,8 +185,11 @@ class GetmyadRating(object):
                 # except Exception as ex:
                 #     print(ex, "worker_stats", x)
 
+                adload_cost = float(x.get('adload_cost', 0.0))
+
+                if adload_cost > 0.0:
+                    value['$set'] = {'cost': adload_cost}
                 try:
-                    value['$max'] = {'cost': float(x.get('adload_cost', 0.0))}
                     operations_offer.append(
                         pymongo.UpdateOne({'guid': x['offer']},
                                           value, upsert=False)
