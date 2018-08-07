@@ -486,6 +486,53 @@ class GetmyadStats(object):
         self.db.config.update({'key': 'last stats_daily update date'},
                               {'$set': {'value': datetime.datetime.now()}}, upsert=True)
 
+    def importBlockClicksFromMongo(self):
+        u"""Обработка кликов из mongo"""
+        elapsed_start_time = datetime.datetime.now()
+        # _id последней записи, обработанной скриптом. Если не было обработано ничего, равно None
+        last_processed_id = None
+        try:
+            last_processed_id = self.db.config.find_one({'key': 'block clicks last _id'})['value']
+        except:
+            last_processed_id = None
+        if not isinstance(last_processed_id, bson.objectid.ObjectId):
+            last_processed_id = None
+
+        cursor = self.db['clicks.rejected'].find().sort("$natural", pymongo.DESCENDING)
+        try:
+            end_id = cursor[0]['_id']  # Последний id, который будет обработан в этот раз
+        except:
+            print("importClicksFromMongo: nothing to do")
+            return
+
+        buffer_click = []
+        processed_records = 0
+        for x in cursor:
+
+            if last_processed_id is not None and x['_id'] == last_processed_id:
+                break
+            buffer_click.append(x)
+
+        self.db.config.update({'key': 'block clicks last _id'}, {'$set': {'value': end_id}}, upsert=True)
+
+        for x in buffer_click:
+            processed_records += 1
+            error_id = x.get('error_id', 0)
+            key = 'click_warning'
+            if error_id == 2:
+                key = 'click_bann'
+            elif error_id >= 3:
+                key = 'click_filtered'
+            self.db.stats.daily.raw.update({'guid': x['inf'],
+                                            'date': datetime.datetime.fromordinal(x['dt'].toordinal())},
+                                           {'$inc': {
+                                               key: 1
+                                           }}, upsert=True)
+
+        print("Finished %s records in %s seconds" % (
+        processed_records, (datetime.datetime.now() - elapsed_start_time).seconds))
+
+
     def processMongoStats(self, date):
         date = datetime.datetime(date.year, date.month, date.day, 0, 0)
         informersBySite = {}
@@ -534,6 +581,9 @@ class GetmyadStats(object):
                     'social_clicks': {'$sum': '$social_clicks'},
                     'social_clicksUnique': {'$sum': '$social_clicksUnique'},
                     'view_seconds': {'$sum': '$view_seconds'},
+                    'click_warning': {'$sum': '$click_warning'},
+                    'click_filtered': {'$sum': '$click_filtered'},
+                    'click_bann': {'$sum': '$click_bann'}
                 }
             }
         ]
@@ -607,7 +657,10 @@ class GetmyadStats(object):
                           'ctr_impressions': ctr_impressions,
                           'ctr_social_impressions': ctr_social_impressions,
                           'ctr_difference_impressions': ctr_difference_impressions,
-                          'view_seconds': view_seconds
+                          'view_seconds': view_seconds,
+                          'click_warning': inf['click_warning'],
+                          'click_filtered': inf['click_filtered'],
+                          'click_bann': inf['click_bann']
                           }
                  }
             )
@@ -655,7 +708,10 @@ class GetmyadStats(object):
                     'social_impressions_not_valid': {'$sum': '$social_impressions_not_valid'},
                     'social_clicks': {'$sum': '$social_clicks'},
                     'social_clicksUnique': {'$sum': '$social_clicksUnique'},
-                    'view_seconds': {'$sum': '$view_seconds'}
+                    'view_seconds': {'$sum': '$view_seconds'},
+                    'click_warning': {'$sum': '$click_warning'},
+                    'click_filtered': {'$sum': '$click_filtered'},
+                    'click_bann': {'$sum': '$click_bann'}
                 }
             }
         ]
@@ -704,7 +760,10 @@ class GetmyadStats(object):
                           'ctr_impressions': ctr_impressions,
                           'ctr_social_impressions': ctr_social_impressions,
                           'ctr_difference_impressions': ctr_difference_impressions,
-                          'view_seconds': x['view_seconds']
+                          'view_seconds': x['view_seconds'],
+                          'click_warning': x['click_warning'],
+                          'click_filtered': x['click_filtered'],
+                          'click_bann': x['click_bann']
                           }}
             )
 
@@ -745,7 +804,10 @@ class GetmyadStats(object):
                     'social_impressions_not_valid': {'$sum': '$social_impressions_not_valid'},
                     'social_clicks': {'$sum': '$social_clicks'},
                     'social_clicksUnique': {'$sum': '$social_clicksUnique'},
-                    'view_seconds': {'$sum': '$view_seconds'}
+                    'view_seconds': {'$sum': '$view_seconds'},
+                    'click_warning': {'$sum': '$click_warning'},
+                    'click_filtered': {'$sum': '$click_filtered'},
+                    'click_bann': {'$sum': '$click_bann'}
                 }
             }
         ]
@@ -793,7 +855,10 @@ class GetmyadStats(object):
                           'ctr_impressions': ctr_impressions,
                           'ctr_social_impressions': ctr_social_impressions,
                           'ctr_difference_impressions': ctr_difference_impressions,
-                          'view_seconds': x['view_seconds']
+                          'view_seconds': x['view_seconds'],
+                          'click_warning': x['click_warning'],
+                          'click_filtered': x['click_filtered'],
+                          'click_bann': x['click_bann']
                           }}
 
             )
@@ -834,7 +899,10 @@ class GetmyadStats(object):
                     'social_impressions_not_valid': {'$sum': '$social_impressions_not_valid'},
                     'social_clicks': {'$sum': '$social_clicks'},
                     'social_clicksUnique': {'$sum': '$social_clicksUnique'},
-                    'view_seconds': {'$sum': '$view_seconds'}
+                    'view_seconds': {'$sum': '$view_seconds'},
+                    'click_warning': {'$sum': '$click_warning'},
+                    'click_filtered': {'$sum': '$click_filtered'},
+                    'click_bann': {'$sum': '$click_bann'}
                 }
             }
         ]
@@ -879,7 +947,10 @@ class GetmyadStats(object):
                           'ctr_impressions': ctr_impressions,
                           'ctr_social_impressions': ctr_social_impressions,
                           'ctr_difference_impressions': ctr_difference_impressions,
-                          'view_seconds': x['view_seconds']
+                          'view_seconds': x['view_seconds'],
+                          'click_warning': x['click_warning'],
+                          'click_filtered': x['click_filtered'],
+                          'click_bann': x['click_bann']
                           }}
             )
 

@@ -218,6 +218,7 @@ def stats_daily_adv_update():
     print('Import worker data elapsed %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
     print('Count clicks to stats_daily is start')
     stats.importClicksFromMongo()
+    stats.importBlockClicksFromMongo()
     print('Count cliks elapsed %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
     print('Update stats_daily_adv is start')
     stats.processMongoStats(datetime.date.today())
