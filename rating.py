@@ -448,32 +448,57 @@ class GetmyadRating(object):
         u"""Обризаем показы"""
         of_im = 1000000
         of_inf_im = 250000
-        for item in self.db.offer.find({'full_impressions': {'$gte': of_im * 4}, 'retargeting': False}):
+        ratio = 1
+        operations = []
+        projection = {'_id': True, 'full_impressions': True, 'full_clicks': True}
+        for item in self.db.offer.find({'full_impressions': {'$gte': of_im * ratio}, 'retargeting': False}, projection):
+            full_impressions = item.get('full_impressions', 0)
+            full_clicks = item.get('full_clicks', 0)
+            data = {}
+            propor = None
+            if (full_clicks and full_impressions) > 0:
+                propor = (float(full_clicks) / full_impressions)
+
+            data['full_impressions'] = of_im * ratio
+
+            if propor is not None:
+                data['full_clicks'] = int(propor * of_im * ratio)
+
+            try:
+                operations.append(
+                    pymongo.UpdateOne({'_id': item['_id']},
+                                      {'$set': data}, upsert=False)
+                )
+            except Exception as ex:
+                print(ex, "buffer", item['_id'])
+        try:
+            self.db.offer.bulk_write(operations, ordered=False)
+        except BulkWriteError as bwe:
+            print(bwe.details)
+
+        operations = []
+        projection = {'_id': True, 'full_impressions': True, 'full_clicks': True}
+        for item in self.db.stats_daily.rating.find({'full_impressions': {'$gte': of_inf_im * ratio}}, projection):
             full_impressions = item.get('full_impressions', 0)
             full_clicks = item.get('full_clicks', 0)
 
+            propor = None
             if (full_clicks and full_impressions) > 0:
                 propor = (float(full_clicks) / full_impressions)
-            else:
-                item['full_impressions'] = of_im * 3
-                self.db.offer.save(item)
-                continue
 
-            item['full_impressions'] = of_im * 3
-            item['full_clicks'] = int(propor * of_im * 3)
-            self.db.offer.save(item)
+            data['full_impressions'] = of_inf_im * ratio
 
-        for item in self.db.stats_daily.rating.find({'full_impressions': {'$gte': of_inf_im * 4}}):
-            full_impressions = item.get('full_impressions', 0)
-            full_clicks = item.get('full_clicks', 0)
+            if propor is not None:
+                data['full_clicks'] = int(propor * of_inf_im * ratio)
 
-            if (full_clicks and full_impressions) > 0:
-                propor = (float(full_clicks) / full_impressions)
-            else:
-                item['full_impressions'] = of_inf_im * 4
-                self.db.stats_daily.rating.save(item)
-                continue
-
-            item['full_impressions'] = of_inf_im * 4
-            item['full_clicks'] = int(propor * of_inf_im * 4)
-            self.db.stats_daily.rating.save(item)
+            try:
+                operations.append(
+                    pymongo.UpdateOne({'_id': item['_id']},
+                                      {'$set': data}, upsert=False)
+                )
+            except Exception as ex:
+                print(ex, "buffer", item['_id'])
+        try:
+            self.db.stats_daily.rating.bulk_write(operations, ordered=False)
+        except BulkWriteError as bwe:
+            print(bwe.details)
