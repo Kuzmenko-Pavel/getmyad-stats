@@ -455,15 +455,12 @@ class GetmyadRating(object):
             full_impressions = item.get('full_impressions', 0)
             full_clicks = item.get('full_clicks', 0)
             data = {}
-            propor = None
+            propor = 0
             if (full_clicks and full_impressions) > 0:
                 propor = (float(full_clicks) / full_impressions)
 
-            data['full_impressions'] = of_im * ratio
-
-            if propor is not None:
-                data['full_clicks'] = int(propor * of_im * ratio)
-
+            data['full_impressions'] = int(of_im * ratio)
+            data['full_clicks'] = int(propor * of_im * ratio)
             try:
                 operations.append(
                     pymongo.UpdateOne({'_id': item['_id']},
@@ -482,15 +479,12 @@ class GetmyadRating(object):
             full_impressions = item.get('full_impressions', 0)
             full_clicks = item.get('full_clicks', 0)
 
-            propor = None
+            propor = 0
             if (full_clicks and full_impressions) > 0:
                 propor = (float(full_clicks) / full_impressions)
 
-            data['full_impressions'] = of_inf_im * ratio
-
-            if propor is not None:
-                data['full_clicks'] = int(propor * of_inf_im * ratio)
-
+            data['full_impressions'] = int(of_inf_im * ratio)
+            data['full_clicks'] = int(propor * of_inf_im * ratio)
             try:
                 operations.append(
                     pymongo.UpdateOne({'_id': item['_id']},
