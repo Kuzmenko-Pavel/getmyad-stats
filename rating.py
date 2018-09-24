@@ -461,6 +461,7 @@ class GetmyadRating(object):
             data['full_impressions'] = int(of_im * ratio)
             data['full_clicks'] = int(propor * of_im * ratio)
             data['trunkete_info'] = {
+                'date_update': datetime.datetime.now(),
                 'old_full_impressions': full_impressions,
                 'old_full_clicks': full_clicks,
                 'new_full_impressions': data['full_impressions'],
@@ -491,6 +492,7 @@ class GetmyadRating(object):
             data['full_impressions'] = int(of_inf_im * ratio)
             data['full_clicks'] = int(propor * of_inf_im * ratio)
             data['trunkete_info'] = {
+                'date_update': datetime.datetime.now(),
                 'old_full_impressions': full_impressions,
                 'old_full_clicks': full_clicks,
                 'new_full_impressions': data['full_impressions'],
