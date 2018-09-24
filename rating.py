@@ -421,7 +421,6 @@ class GetmyadRating(object):
         offersId = []
         campaignIdList = [x['guid'] for x in self.db.campaign.find({"showConditions.retargeting": False}, {'guid': 1})]
         informerIdList = [x['guid'] for x in self.db.informer.find({}, {'guid': 1})]
-        print(informerIdList)
         queri = {"campaignId": {"$in": campaignIdList}}
         for item in self.db.offer.find(queri, {"guid": 1, "_id": 0}):
             offersId.append(item['guid'])
@@ -461,6 +460,12 @@ class GetmyadRating(object):
 
             data['full_impressions'] = int(of_im * ratio)
             data['full_clicks'] = int(propor * of_im * ratio)
+            data['trunkete_info'] = {
+                'old_full_impressions': full_impressions,
+                'old_full_clicks': full_clicks,
+                'new_full_impressions': data['full_impressions'],
+                'new_full_clicks': data['full_clicks'],
+            }
             try:
                 operations.append(
                     pymongo.UpdateOne({'_id': item['_id']},
@@ -485,6 +490,12 @@ class GetmyadRating(object):
 
             data['full_impressions'] = int(of_inf_im * ratio)
             data['full_clicks'] = int(propor * of_inf_im * ratio)
+            data['trunkete_info'] = {
+                'old_full_impressions': full_impressions,
+                'old_full_clicks': full_clicks,
+                'new_full_impressions': data['full_impressions'],
+                'new_full_clicks': data['full_clicks'],
+            }
             try:
                 operations.append(
                     pymongo.UpdateOne({'_id': item['_id']},
