@@ -484,7 +484,7 @@ class GetmyadRating(object):
         for item in self.db.stats_daily.rating.find({'full_impressions': {'$gte': of_inf_im * ratio}}, projection):
             full_impressions = item.get('full_impressions', 0)
             full_clicks = item.get('full_clicks', 0)
-
+            data = {}
             propor = 0
             if (full_clicks and full_impressions) > 0:
                 propor = (float(full_clicks) / full_impressions)
