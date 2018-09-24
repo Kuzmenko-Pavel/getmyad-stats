@@ -219,13 +219,13 @@ class GetmyadRating(object):
 
     def createOfferRating(self):
         msg = {}
-        campaignIdList = [x['guid'] for x in
-                          self.db.campaign.find({"showConditions.retargeting": False, "status": "working"}, {
+        campaign_id_list = [x['guid'] for x in
+                            self.db.campaign.find({"showConditions.retargeting": False, "status": "working"}, {
                               'guid': 1,
                               '_id': -1
                           })]
-        queri = {"campaignId": {"$in": campaignIdList}}
-        fields = {'_id': 0, 'impressions': 1, 'clicks': 1, 'full_impressions': 1, 'full_clicks': 1, 'cost': 1,
+        queri = {"campaignId": {"$in": campaign_id_list}}
+        fields = {'_id': 1, 'impressions': 1, 'clicks': 1, 'full_impressions': 1, 'full_clicks': 1, 'cost': 1,
                   'guid': 1, 'campaignId': 1}
         offers = self.db.offer.find(queri, fields)
         offer_count = 0
@@ -253,16 +253,18 @@ class GetmyadRating(object):
                 udata['last_rating_update'] = date_update
                 udata['old_impressions'] = impressions
                 udata['old_clicks'] = clicks
+
             if full_impressions > 1500:
                 rating = (full_ctr * offer_cost) * 100000
                 udata['full_rating'] = round(rating, 4)
                 udata['last_full_rating_update'] = date_update
                 offer_count += 1
                 msg[offer['guid']] = offer['campaignId']
+
             if len(udata) > 0:
                 try:
                     operations.append(
-                        pymongo.UpdateOne({'guid': offer['guid']}, {'$set': udata}, upsert=False)
+                        pymongo.UpdateOne({'_id': offer['_id']}, {'$set': udata}, upsert=False)
                     )
                 except Exception as ex:
                     print(ex, "buffer", offer['guid'], udata)
@@ -330,22 +332,24 @@ class GetmyadRating(object):
         offer_count = 0
         costs = {}
         msg = {}
-        informersBySite = {}
-        informersByTitle = {}
+
+        informers_by_site = {}
+        informers_by_title = {}
         for informer in self.db.informer.find({}, {'guid': True, 'domain': True, 'title': True}):
             try:
-                informersBySite[informer['guid']] = informer.get('domain', 'NOT DOMAIN')
-                informersByTitle[informer['guid']] = informer.get('title', 'NOT TITLE')
+                informers_by_site[informer['guid']] = informer.get('domain', 'NOT DOMAIN')
+                informers_by_title[informer['guid']] = informer.get('title', 'NOT TITLE')
             except:
                 pass
-        campaignIdList = []
+
+        campaign_id_list = []
         campaign = {}
         for x in self.db.campaign.find({"showConditions.retargeting": False, "status": "working"},
                                        {'guid': 1, 'title': 1, '_id': -1}):
-            campaignIdList.append(x['guid'])
+            campaign_id_list.append(x['guid'])
             campaign[x['guid']] = x['title']
 
-        queri = {"campaignId": {"$in": campaignIdList}}
+        queri = {"campaignId": {"$in": campaign_id_list}}
         for item in self.db.offer.find(queri, {'guid': 1, 'cost': 1, 'title': 1, '_id': -1}):
             costs[item['guid']] = [item['cost'], item['title']]
 
@@ -353,12 +357,14 @@ class GetmyadRating(object):
         operations = []
         for offer in offers:
             udata = {}
+
             impressions = offer.get('impressions', 0)
             clicks = offer.get('clicks', 0)
             full_impressions = offer.get('full_impressions', 0)
             full_clicks = offer.get('full_clicks', 0)
-            offer_cost, offer_title = costs.get(offer['guid'], [0.5, ''])
-            campaignTitle = campaign.get(offer['campaignId'], '')
+            offer_cost, offer_title = costs.get(offer['guid'], [1, ''])
+            campaign_title = campaign.get(offer['campaignId'], '')
+
             if (clicks and impressions) > 0:
                 ctr = ((float(clicks) / impressions) * 100)
             else:
@@ -368,43 +374,43 @@ class GetmyadRating(object):
                 full_ctr = ((float(full_clicks) / full_impressions) * 100)
             else:
                 full_ctr = 0
+
+            if offer.get('title', '') == '':
+                udata['title'] = offer_title
+
+            if offer.get('campaignTitle', '') == '':
+                udata['campaignTitle'] = campaign_title
+
+            if offer.get('adv_domain', '') == '':
+                udata['adv_domain'] = informers_by_site.get(offer['adv'], '')
+
+            if offer.get('adv_title', '') == '':
+                udata['adv_title'] = informers_by_title.get(offer['adv'], '')
+
             if impressions > 1500:
                 rating = (ctr * offer_cost) * 100000
                 udata['rating'] = round(rating, 4)
                 udata['last_rating_update'] = date_update
                 udata['old_impressions'] = impressions
                 udata['cost'] = offer_cost
-                udata['adv_domain'] = informersBySite.get(offer['adv'], '')
-                udata['adv_title'] = informersByTitle.get(offer['adv'], '')
                 udata['old_clicks'] = clicks
-                udata['title'] = offer_title
-                udata['campaignTitle'] = campaignTitle
-            else:
-                if offer.get('last_rating_update') is None:
-                    udata['adv_domain'] = informersBySite.get(offer['adv'], '')
-                    udata['adv_title'] = informersByTitle.get(offer['adv'], '')
-                    udata['title'] = offer_title
-                    udata['campaignTitle'] = campaignTitle
 
             if full_impressions > 1500:
                 offer_count += 1
                 rating = (full_ctr * offer_cost) * 100000
-                msg[offer['adv']] = offer['adv_int']
                 udata['full_rating'] = round(rating, 4)
                 udata['cost'] = offer_cost
                 udata['last_full_rating_update'] = date_update
-                udata['title'] = offer_title
-                udata['campaignTitle'] = campaignTitle
+                msg[offer['adv']] = offer['adv_int']
+
             if len(udata) > 0:
                 try:
                     operations.append(
-                        pymongo.UpdateOne({'guid_int': offer['guid_int'],
-                                           'campaignId_int': offer['campaignId_int'],
-                                           'adv_int': offer['adv_int']},
+                        pymongo.UpdateOne({'_id': offer['_id']},
                                           {'$set': udata}, upsert=False)
                     )
                 except Exception as ex:
-                    print(ex, "buffer", offer['guid'], udata)
+                    print(ex, "buffer", offer['_id'], udata)
 
         try:
             self.db.stats_daily.rating.bulk_write(operations, ordered=False)
@@ -419,13 +425,14 @@ class GetmyadRating(object):
     def delete_old_rating_stats(self):
         u"""Удаляем старую статистику"""
         offersId = []
-        campaignIdList = [x['guid'] for x in self.db.campaign.find({"showConditions.retargeting": False}, {'guid': 1})]
-        informerIdList = [x['guid'] for x in self.db.informer.find({}, {'guid': 1})]
-        queri = {"campaignId": {"$in": campaignIdList}}
+        campaign_id_list = [x['guid'] for x in
+                            self.db.campaign.find({"showConditions.retargeting": False}, {'guid': 1})]
+        informer_id_list = [x['guid'] for x in self.db.informer.find({}, {'guid': 1})]
+        queri = {"campaignId": {"$in": campaign_id_list}}
         for item in self.db.offer.find(queri, {"guid": 1, "_id": 0}):
             offersId.append(item['guid'])
 
-        a = self.db.stats_daily.rating.delete_many({'adv': {'$nin': informerIdList}})
+        a = self.db.stats_daily.rating.delete_many({'adv': {'$nin': informer_id_list}})
         d = self.db.stats_daily.rating.delete_many({'full_rating': 0})
         i = self.db.stats_daily.rating.delete_many({'guid': {'$nin': offersId}})
         # Сбрасуем показы и клики в товарах
