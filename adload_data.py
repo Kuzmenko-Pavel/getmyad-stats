@@ -52,7 +52,7 @@ class AdloadData(object):
             cursor.execute('''SELECT TOP 1 1 AS status FROM View_Lot AS l
                               INNER JOIN LotByAdvertise AS la ON l.LotID = la.LotID
                               INNER JOIN View_Advertise as va on la.AdvertiseID = va.AdvertiseID
-                              WHERE la.AdvertiseID = %s AND l.isAdvertising = 1 AND and va.isActive = 1''', campaign)
+                              WHERE la.AdvertiseID = %s AND l.isAdvertising = 1 AND va.isActive = 1''', campaign)
             if cursor.fetchone() is None:
                 return False
             return True
