@@ -178,7 +178,7 @@ def check_outdated_campaigns():
     print('Check outdate campaigns is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
-# @periodic_task(run_every=crontab(minute=[0, 10, 20, 30, 40, 50]))
+@periodic_task(run_every=crontab(minute=[0, 10, 20, 30, 40, 50]))
 def check_campaigns():
     u"""Иногда AdLoad не оповещает GetMyAd об остановке кампании.
         Данная задача проверяет, не произошло ли за последнее время несколько
