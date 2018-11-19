@@ -36,10 +36,10 @@ class AdloadData(object):
         '''
         with self.connection_adload.cursor(as_dict=True) as cursor:
             cursor.execute('''SELECT 1 AS status
-                            FROM View_Advertise AS a
-                            LEFT OUTER JOIN Users AS u ON u.UserID = a.UserID
-                            LEFT OUTER JOIN Manager AS m  ON u.ManagerID = m.id
-                            WHERE  a.AdvertiseID = %s''', campaign)
+                              FROM View_Advertise AS a
+                              INNER JOIN Users AS u ON u.UserID = a.UserID
+                              INNER JOIN Manager AS m  ON u.ManagerID = m.id
+                              WHERE  a.AdvertiseID = %s''', campaign)
             if cursor.fetchone() is None:
                 return False
             return True
@@ -49,10 +49,9 @@ class AdloadData(object):
         Формат ответа::
         '''
         with self.connection_adload.cursor(as_dict=True) as cursor:
-            cursor.execute('''SELECT TOP 1 1 AS status FROM View_Lot AS l
-                              INNER JOIN LotByAdvertise AS la ON l.LotID = la.LotID
-                              INNER JOIN View_Advertise as va on la.AdvertiseID = va.AdvertiseID
-                              WHERE la.AdvertiseID = %s AND l.isAdvertising = 1 AND va.isActive = 1''', campaign)
+            cursor.execute('''SELECT isActive
+                              FROM View_Advertise
+                              WHERE isActive = 1 AND AdvertiseID = %s''', campaign)
             if cursor.fetchone() is None:
                 return False
             return True
