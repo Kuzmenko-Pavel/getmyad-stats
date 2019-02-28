@@ -44,3 +44,7 @@ class MQ():
     def offer_rating_update(self):
         msg = amqp.Message('')
         self.ch.basic_publish(msg, exchange='getmyad', routing_key='rating.offer')
+
+    def campaign_thematic(self, campaign_id):
+        msg = amqp.Message(campaign_id)
+        self.ch.basic_publish(msg, exchange='getmyad', routing_key='campaign.thematic')

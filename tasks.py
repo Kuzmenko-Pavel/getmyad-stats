@@ -130,6 +130,18 @@ def stop_old_campaign():
 
 
 @periodic_task(run_every=crontab(minute="0", hour="0"))
+def campaign_thematic():
+    u"""Останавливаем компании из холда"""
+    print('Start update thematic campaign')
+    elapsed_start_time = datetime.datetime.now()
+    db = _mongo_main_db()
+    rpc = xmlrpclib.ServerProxy(GETMYAD_XMLRPC_HOST)
+    check = GetmyadCheck(db, rpc)
+    check.campaign_thematic()
+    print('Stop update thematic campaign is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
+
+
+@periodic_task(run_every=crontab(minute="0", hour="0"))
 def delete_old_stats():
     u"""Удаляем старую статистику"""
     print('Delete old data is start')

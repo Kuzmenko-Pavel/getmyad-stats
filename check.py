@@ -5,6 +5,7 @@ import pymongo
 import requests
 
 from adload_data import AdloadData, mssql_connection_adload
+from mq import MQ
 
 
 class GetmyadCheck():
@@ -12,6 +13,7 @@ class GetmyadCheck():
         self.db = db
         self.rpc = rpc
         self.watch_last_n_minutes = 10
+        self.mq = MQ()
 
     def check_outdated_campaigns(self):
         """ Иногда AdLoad не оповещает GetMyAd об остановке кампании, об отработке
@@ -74,3 +76,8 @@ class GetmyadCheck():
                 url = 'http://%s%s' % (cdn, item)
                 r = requests.get(url, headers=headers, verify=False)
                 print('%s - %s' % (url, r.status_code))
+
+    def campaign_thematic(self):
+        c = self.db['campaign'].find({'thematic': True}, {'guid': 1})
+        for item in c:
+            self.mq.campaign_thematic(item['guid'])
