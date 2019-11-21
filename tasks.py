@@ -13,7 +13,7 @@ from rating import GetmyadRating
 from statistic import GetmyadStats
 
 GETMYAD_XMLRPC_HOST = 'https://getmyad.yottos.com/rpc'
-MONGO_HOST = 'srv-5.yottos.com:27018,srv-5.yottos.com:27019,srv-5.yottos.com:27020'
+MONGO_HOST = 'srv-3.yottos.com:27017'
 MONGO_DATABASE = 'getmyad_db'
 MONGO_WORKER_HOST_POOL = ['srv-2.yottos.com:27017', ]
 
@@ -53,7 +53,7 @@ def _mongo_worker_db_pool():
     return pool
 
 
-@periodic_task(run_every=crontab(hour="*", minute=0))
+# @periodic_task(run_every=crontab(hour="*", minute=0))
 def clean_ip_blacklist():
     u"""Удаляет старые записи из чёрного списка"""
     print('Clean IP Blacklist is start')
@@ -64,7 +64,7 @@ def clean_ip_blacklist():
     print('Clean IP Blacklist is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
-@periodic_task(run_every=crontab(hour=[1, 3, 6, 9, 12, 15, 18, 21, 23], minute=0))
+#@periodic_task(run_every=crontab(hour=[1, 3, 6, 9, 12, 15, 18, 21, 23], minute=0))
 def delete_old_offers():
     u"""Удаляет старые записи из чёрного списка"""
     print('Delete old offers is start')
@@ -75,7 +75,7 @@ def delete_old_offers():
     print('Delete old offers is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
-@periodic_task(run_every=crontab(hour=[1, 11, 16, 21], minute=0))
+#@periodic_task(run_every=crontab(hour=[1, 11, 16, 21], minute=0))
 def manager_invoce_calck():
     print('Manager invoce calck stats is start')
     elapsed_start_time = datetime.datetime.now()
@@ -84,7 +84,7 @@ def manager_invoce_calck():
     print('Manager invoce calck stats is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
-@periodic_task(run_every=crontab(hour=[0, 8, 16], minute=0))
+#@periodic_task(run_every=crontab(hour=[0, 8, 16], minute=0))
 def decline_unconfirmed_moneyout_requests():
     u"""Отклоняет заявки, которые пользователи не подтвердили в течении трёх
         дней"""
@@ -97,7 +97,7 @@ def decline_unconfirmed_moneyout_requests():
         datetime.datetime.now() - elapsed_start_time).seconds)
 
 
-@periodic_task(run_every=crontab(minute="20, 45", hour="*"))
+#@periodic_task(run_every=crontab(minute="20, 45", hour="*"))
 def create_offer_rating():
     u"""Создаем отдельные рейтинги для каждого рекламного блока"""
     elapsed_start_time = datetime.datetime.now()
@@ -117,7 +117,7 @@ def create_offer_rating():
     print('Create rating for offer is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
-@periodic_task(run_every=crontab(minute="0", hour="0"))
+#@periodic_task(run_every=crontab(minute="0", hour="0"))
 def stop_old_campaign():
     u"""Останавливаем компании из холда"""
     print('Stop old campaign is start')
@@ -129,7 +129,7 @@ def stop_old_campaign():
     print('Stop old campaign is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
-@periodic_task(run_every=crontab(minute="0", hour="0"))
+#@periodic_task(run_every=crontab(minute="0", hour="0"))
 def campaign_thematic():
     u"""Останавливаем компании из холда"""
     print('Start update thematic campaign')
@@ -141,7 +141,7 @@ def campaign_thematic():
     print('Stop update thematic campaign is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
-@periodic_task(run_every=crontab(minute="0", hour="0"))
+#@periodic_task(run_every=crontab(minute="0", hour="0"))
 def delete_old_stats():
     u"""Удаляем старую статистику"""
     print('Delete old data is start')
@@ -152,7 +152,7 @@ def delete_old_stats():
     print('Delete old data is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
-@periodic_task(run_every=crontab(minute="0", hour="0"))
+#@periodic_task(run_every=crontab(minute="0", hour="0"))
 def delete_click_rejected():
     u"""Удаляем старые отклонённые клики"""
     print('Delete old click rejected is start')
@@ -163,7 +163,7 @@ def delete_click_rejected():
     print('Delete old click rejected is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
-@periodic_task(run_every=crontab(minute=10, hour=0))
+#@periodic_task(run_every=crontab(minute=10, hour=0))
 def delete_old_rating_stats():
     u"""Удаляем старую статистику для рейтингов"""
     print('Delete old rating data is start')
@@ -176,7 +176,7 @@ def delete_old_rating_stats():
     print('Delete old rating data is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
-@periodic_task(run_every=crontab(minute=[5, 15, 25, 35, 45, 55]))
+#@periodic_task(run_every=crontab(minute=[5, 15, 25, 35, 45, 55]))
 def check_outdated_campaigns():
     u"""Иногда AdLoad не оповещает GetMyAd об остановке кампании.
         Данная задача проверяет, не произошло ли за последнее время несколько
@@ -190,7 +190,7 @@ def check_outdated_campaigns():
     print('Check outdate campaigns is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
-@periodic_task(run_every=crontab(minute=[0, 10, 20, 30, 40, 50]))
+#@periodic_task(run_every=crontab(minute=[0, 10, 20, 30, 40, 50]))
 def check_campaigns():
     u"""Иногда AdLoad не оповещает GetMyAd об остановке кампании.
         Данная задача проверяет, не произошло ли за последнее время несколько
@@ -204,7 +204,7 @@ def check_campaigns():
     print('Check outdate campaigns is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
-@periodic_task(run_every=crontab(minute=[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]))
+#@periodic_task(run_every=crontab(minute=[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]))
 def check_cdn():
     print('Check cdn is start')
     elapsed_start_time = datetime.datetime.now()
@@ -215,7 +215,7 @@ def check_cdn():
     print('Check cdn is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
-@periodic_task(run_every=crontab(hour="*", minute="15, 40"))
+@periodic_task(run_every=crontab(hour="*", minute="0"))
 def stats_daily_adv_update():
     u"""Обработка (агрегация) статистики"""
     db = _mongo_main_db()
@@ -278,7 +278,7 @@ def stats_daily_adv_update_tomoroy():
     print('Agregate Daily stats is end %s second' % (datetime.datetime.now() - elapsed_start_time).seconds)
 
 
-@periodic_task(run_every=crontab(minute="0", hour="23"))
+# @periodic_task(run_every=crontab(minute="0", hour="23"))
 def create_xsl_report():
     u"""Создаёт xls отчёты"""
     print('Create XLS report')
